@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — live-session Hyprland launcher ━━━
+# SDDM autologin (Session=bite-os-hyprland) calls THIS.
+#
+# Hard-won lesson: pouring the full caelestia rice (/etc/skel) into the live
+# user's home makes quickshell/caelestia crash inside the archiso boot overlay,
+# which dumps you into emergency Hyprland AND leaves the installer with no
+# usable Wayland session. So on the LIVE ISO we ignore the rice entirely and
+# launch a tiny, known-good config (/usr/share/bite-os/live/) whose only job is
+# to show a desktop and start the installer. The real rice lands later, on the
+# INSTALLED system, via the bite-os package's /etc/skel.
+set -u
+LOG=/tmp/bite-os-session.log
+LIVE_DIR=/usr/share/bite-os/live
+
+{
+    echo "════════ $(date -Is) bite-os-hyprland-session ════════"
+    echo "uid=$(id -u) home=$HOME"
+
+    # Are we on the live ISO? archiso mounts /run/archiso and sets the
+    # archisobasedir kernel arg. Either marker means "live".
+    if [ -d /run/archiso ] || grep -q archisobasedir /proc/cmdline 2>/dev/null; then
+        echo "stage: LIVE ISO detected → using minimal live config"
+        install -d "$HOME/.config/hypr"
+        cp -f "$LIVE_DIR/hyprland.conf"  "$HOME/.config/hypr/hyprland.conf"
+        cp -f "$LIVE_DIR/hyprpaper.conf" "$HOME/.config/hypr/hyprpaper.conf"
+        chown -R "$(id -u):$(id -g)" "$HOME/.config/hypr" 2>/dev/null || true
+        echo "stage: live hyprland.conf size=$(stat -c%s "$HOME/.config/hypr/hyprland.conf" 2>/dev/null)"
+    else
+        # Installed system (safety net): make sure home has the real rice.
+        echo "stage: not live → ensuring /etc/skel rice is present"
+        if [ -d /etc/skel ] && [ "$(find /etc/skel -type f 2>/dev/null | wc -l)" -gt 10 ]; then
+            (cd /etc/skel && tar -cf - .) | (cd "$HOME" && tar -xf - --skip-old-files 2>/dev/null)
+        fi
+    fi
+
+    echo "exec: /usr/bin/Hyprland"
+} >> "$LOG" 2>&1
+
+# Launch Hyprland directly so it reads ~/.config/hypr/hyprland.conf.
+exec /usr/bin/Hyprland "$@"

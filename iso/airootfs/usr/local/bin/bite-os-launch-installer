@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — auto-launch the installer once the live desktop is ready ━━━
+# Called as `exec-once` from the live Hyprland config. Waits for the Wayland
+# compositor socket to actually exist before starting Calamares, so the
+# installer never races the desktop and fails to open a window.
+set -u
+LOG=/tmp/bite-os-launch-installer.log
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+WAYLAND="${WAYLAND_DISPLAY:-wayland-1}"
+
+{
+    echo "── $(date '+%F %T') ── waiting for $RUNTIME/$WAYLAND"
+    for i in $(seq 1 30); do
+        [ -S "$RUNTIME/$WAYLAND" ] && break
+        sleep 0.5
+    done
+    # A little extra settle time for the portal/services to come up.
+    sleep 2
+    echo "launching installer"
+} >> "$LOG" 2>&1
+
+notify-send "BITE-OS Installer" "Starting the installer… (re-open it anytime with SUPER+I or 'Install BITE-OS')" 2>/dev/null || true
+
+exec /usr/local/bin/install-bite-os

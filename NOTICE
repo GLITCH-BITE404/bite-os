@@ -1,0 +1,49 @@
+BITE-OS
+Copyright (c) 2026 GLITCH-BITE404 (Raphael Virnik) — virnikrephael@gmail.com
+https://github.com/GLITCH-BITE404/BITE-OS · https://tiktok.com/@glitchbite404
+
+================================================================================
+AUTHORSHIP & ATTRIBUTION
+================================================================================
+
+BITE-OS — including its name, wolf logo / branding, the dot-switch + watchdog
+system, the self-repair healthcheck, the live settings engine, the rice vault,
+the installer integration and all original scripts, configuration and artwork
+in this repository — is the original work of GLITCH-BITE404 ("the Author").
+
+This work is licensed under the GNU General Public License v3.0 (see LICENSE).
+
+REQUIRED ATTRIBUTION
+--------------------
+Anyone who copies, redistributes, modifies, or builds upon BITE-OS — in whole
+or in part, including forks, remixes, and derived distributions — MUST:
+
+  1. Retain this NOTICE file and the LICENSE file intact in all copies and
+     derivative works.
+  2. Give clear, visible credit to the Author, GLITCH-BITE404, including a link
+     back to the original project (https://github.com/GLITCH-BITE404/BITE-OS).
+  3. State plainly that their work is based on / derived from BITE-OS and is
+     not the original, and clearly mark any changes they have made.
+  4. Make the complete corresponding source code of any redistributed or
+     modified version available under the same GPL-3.0 license (copyleft).
+
+NAME & BRANDING
+---------------
+The name "BITE-OS", the "// THE SYSTEM BIT YOU" tagline, and the BITE-OS wolf
+logo are identifiers of the Author's project. Derivative or forked works must
+NOT present themselves as the official "BITE-OS" or imply endorsement by the
+Author. Rename your fork and use your own branding while still crediting
+BITE-OS as the upstream source per the terms above.
+
+THIRD-PARTY COMPONENTS
+----------------------
+BITE-OS is built on the CachyOS / Arch Linux base and bundles many independent
+software packages (Hyprland, Calamares, the caelestia shell, fonts, etc.).
+Those components remain under their own respective licenses and copyrights;
+the terms above apply to the Author's own original contributions in this
+repository, not to the bundled upstream packages.
+
+NO WARRANTY
+-----------
+This software is provided "as is", without warranty of any kind, to the extent
+permitted by applicable law. See sections 15–17 of the GNU GPL v3.0 (LICENSE).

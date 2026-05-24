@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Install BITE-OS
+GenericName=System Installer
+Comment=Install BITE-OS to your disk
+Exec=/usr/local/bin/install-bite-os
+Icon=bite-os
+Terminal=false
+Categories=System;Settings;
+Keywords=install;installer;calamares;setup;
+StartupNotify=true

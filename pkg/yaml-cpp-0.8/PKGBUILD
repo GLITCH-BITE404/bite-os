@@ -1,0 +1,60 @@
+# ━━━ BITE-OS — yaml-cpp-0.8 compat package ━━━
+# cachyos-calamares 3.4.1-8 was built against yaml-cpp 0.8. Current Arch /
+# CachyOS repos ship yaml-cpp 0.9.0, which provides libyaml-cpp.so.0.9 but
+# NOT .0.8. Result: calamares fails at startup with
+#   "libyaml-cpp.so.0.8: cannot open shared object file: No such file"
+# This package builds the 0.8 shared library from upstream and ships ONLY the
+# versioned .so files, so it can coexist with the current yaml-cpp without
+# conflicts.
+
+pkgname=yaml-cpp-0.8
+pkgver=0.8.0
+pkgrel=1
+pkgdesc="yaml-cpp 0.8 runtime library (compat for cachyos-calamares)"
+arch=('x86_64')
+url='https://github.com/jbeder/yaml-cpp'
+license=('MIT')
+depends=('glibc' 'libgcc' 'libstdc++')
+makedepends=('cmake' 'git')
+provides=("libyaml-cpp.so=0.8-64")
+# Vendored source — the tarball sits next to the PKGBUILD so the build works
+# offline. If you ever bump pkgver, re-fetch with:
+#   curl -L -o $pkgver.tar.gz \
+#     https://github.com/jbeder/yaml-cpp/archive/refs/tags/$pkgver.tar.gz
+source=("${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "yaml-cpp-${pkgver}"
+    # yaml-cpp 0.8.0 uses uint16_t/uint32_t in emitterutils.cpp without
+    # including <cstdint>. Older GCC pulled it in transitively; newer GCC
+    # doesn't, so the build dies with "‘uint16_t’ was not declared".
+    if ! grep -q '#include <cstdint>' src/emitterutils.cpp; then
+        sed -i '1i#include <cstdint>' src/emitterutils.cpp
+    fi
+}
+
+build() {
+    cd "yaml-cpp-${pkgver}"
+    cmake -B build -S . \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DYAML_BUILD_SHARED_LIBS=ON \
+        -DYAML_CPP_BUILD_TESTS=OFF \
+        -DYAML_CPP_BUILD_TOOLS=OFF \
+        -DYAML_CPP_BUILD_CONTRIB=OFF
+    cmake --build build
+}
+
+package() {
+    cd "yaml-cpp-${pkgver}"
+    # Only ship the versioned .so — the .so symlink (unversioned) and headers
+    # would conflict with yaml-cpp 0.9. We want calamares to find .0.8 and
+    # everything else (compiled against 0.9) to keep using libyaml-cpp.so.0.9.
+    install -d "${pkgdir}/usr/lib"
+    cp -a build/libyaml-cpp.so.0.8* "${pkgdir}/usr/lib/"
+    # Drop the unversioned symlink if cp picked it up — only versioned files.
+    rm -f "${pkgdir}/usr/lib/libyaml-cpp.so"
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

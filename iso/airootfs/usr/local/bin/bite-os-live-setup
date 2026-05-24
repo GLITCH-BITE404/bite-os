@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — live-ISO setup (paranoid edition) ━━━
+# Something in the archiso boot is wiping /home/bite even though customize_airootfs.sh
+# populated it at build time and the squashfs contains the files. Whatever it
+# is — initramfs overlay, useradd somewhere, PAM — we don't trust it anymore.
+# This script ALWAYS force-rebuilds /home/bite from /etc/skel, no guards, no
+# early-exit. Idempotent: re-running just re-copies the same files.
+
+set -u
+LOG=/var/log/bite-os-live-setup.log
+exec >> "$LOG" 2>&1
+echo
+echo "════════ $(date -Is) ════════"
+echo "stage: starting"
+id bite 2>&1 || true
+echo "skel content count: $(find /etc/skel -type f 2>/dev/null | wc -l)"
+echo "bite home content count BEFORE: $(find /home/bite -type f 2>/dev/null | wc -l)"
+
+# 1. Ensure user exists. customize_airootfs.sh should have created bite at
+#    uid 1000 already, but if some weird init wiped /etc/passwd we recreate.
+if ! id bite &>/dev/null; then
+    echo "stage: bite missing from passwd, creating"
+    useradd -m -u 1000 -G wheel,video,audio,network,storage,input,lp -s /bin/bash bite
+fi
+echo 'bite:bite' | chpasswd
+echo 'root:bite' | chpasswd
+
+# 2. Sudoers (NOPASSWD for live session only)
+install -d -m 0750 /etc/sudoers.d
+cat > /etc/sudoers.d/00-bite-live <<'EOF'
+bite ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 440 /etc/sudoers.d/00-bite-live
+
+# 3. FORCE-rebuild /home/bite from /etc/skel. `cp -a` overwrites, so even if
+#    /home/bite is the wrong (empty) version that boot left us, this fixes it.
+#    --no-preserve=ownership keeps everything owned by root, then chown fixes it.
+if [ -d /etc/skel ] && [ "$(find /etc/skel -type f 2>/dev/null | wc -l)" -gt 10 ]; then
+    echo "stage: force-copying /etc/skel → /home/bite"
+    # tar-pipe instead of cp -a to handle any weird overlayfs edge case where
+    # cp -a refuses to overwrite a dir that's "mounted" differently.
+    (cd /etc/skel && tar -cf - .) | (cd /home/bite && tar -xf - --overwrite)
+    echo "stage: tar-pipe exit=$?"
+else
+    echo "WARN: /etc/skel is empty or missing — can't populate /home/bite"
+    ls -la /etc/skel 2>&1 | head -5
+fi
+
+chown -R bite:bite /home/bite
+
+# 4. Drop the installer autostart in the LIVE user's home only (not /etc/skel).
+if [ -f /usr/share/applications/install-bite-os.desktop ]; then
+    install -d -o bite -g bite /home/bite/.config/autostart
+    cp -f /usr/share/applications/install-bite-os.desktop /home/bite/.config/autostart/
+    chown bite:bite /home/bite/.config/autostart/install-bite-os.desktop
+fi
+
+# 5. Sanity report
+echo "stage: done"
+echo "bite home content count AFTER: $(find /home/bite -type f 2>/dev/null | wc -l)"
+echo "hyprland.conf size: $(stat -c%s /home/bite/.config/hypr/hyprland.conf 2>/dev/null || echo MISSING)"
+echo "owner of hyprland.conf: $(stat -c '%U:%G' /home/bite/.config/hypr/hyprland.conf 2>/dev/null || echo MISSING)"
+echo "════════ end ════════"
+
+exit 0

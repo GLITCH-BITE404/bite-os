@@ -1,0 +1,21 @@
+# bite-os package install scriptlet — runs as root via pacman.
+
+_apply() {
+    # Push branding into place immediately.
+    [ -x /usr/bin/bite-os-rebrand ]       && /usr/bin/bite-os-rebrand       || true
+    [ -x /usr/bin/bite-os-fix-fastfetch ] && /usr/bin/bite-os-fix-fastfetch || true
+    [ -x /usr/bin/bite-os-fix-boot ]      && /usr/bin/bite-os-fix-boot      || true
+    # Fix the CachyOS hostname leak (only if still the cachy default).
+    if grep -qi 'cachyos' /etc/hostname 2>/dev/null; then
+        echo 'bite-os' > /etc/hostname
+    fi
+}
+
+post_install() {
+    _apply
+    echo ":: BITE-OS installed. Reboot to land in the riced desktop."
+}
+
+post_upgrade() {
+    _apply
+}

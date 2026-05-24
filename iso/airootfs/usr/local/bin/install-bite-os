@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — installer launcher (GUI, root via sudo) ━━━
+# Calamares must run as root, but the live user's Wayland socket is uid-restricted
+# so a `sudo calamares` simply can't open a window — it fails silently. Two fixes:
+#   1. Loosen the socket perms via setfacl so root can connect to wayland-1.
+#   2. Also export DISPLAY + XAUTHORITY so Qt's xcb fallback (XWayland) works
+#      if wayland still refuses for some reason.
+# Anything that goes wrong gets logged to /tmp/calamares-launch.log AND popped
+# as a notify-send toast, so failures are never invisible.
+set -u
+
+LOG=/tmp/calamares-launch.log
+
+fail() {
+    notify-send -u critical "BITE-OS Installer" "$1 (see $LOG)" 2>/dev/null
+    echo "$(date '+%H:%M:%S')  FAIL: $1" >> "$LOG"
+    exit 1
+}
+
+command -v calamares >/dev/null || fail "Calamares not installed."
+
+UID_NUM="$(id -u)"
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$UID_NUM}"
+WAYLAND="${WAYLAND_DISPLAY:-wayland-1}"
+DISPLAY_VAR="${DISPLAY:-:0}"
+XAUTH="${XAUTHORITY:-$HOME/.Xauthority}"
+
+{
+    echo "── $(date '+%F %T') ──"
+    echo "user=$(id -un) uid=$UID_NUM runtime=$RUNTIME wayland=$WAYLAND display=$DISPLAY_VAR"
+} >> "$LOG"
+
+# Let root connect to the live user's Wayland socket (live ISO only — these
+# permissions are wiped when the installed system creates the real user).
+if [ -S "$RUNTIME/$WAYLAND" ]; then
+    setfacl -m u:root:rw "$RUNTIME/$WAYLAND" 2>>"$LOG" || chmod a+rw "$RUNTIME/$WAYLAND" 2>>"$LOG" || true
+fi
+if [ -d "$RUNTIME" ]; then
+    setfacl -m u:root:rwx "$RUNTIME" 2>>"$LOG" || chmod a+rwx "$RUNTIME" 2>>"$LOG" || true
+fi
+
+# X11 fallback: let root connect to the XWayland display too.
+command -v xhost >/dev/null && xhost +SI:localuser:root >/dev/null 2>>"$LOG" || true
+
+exec sudo -n -E env \
+    HOME=/root \
+    XDG_RUNTIME_DIR="$RUNTIME" \
+    WAYLAND_DISPLAY="$WAYLAND" \
+    DISPLAY="$DISPLAY_VAR" \
+    XAUTHORITY="$XAUTH" \
+    XDG_SESSION_TYPE=wayland \
+    QT_QPA_PLATFORM="wayland;xcb" \
+    QT_WAYLAND_DISABLE_WINDOWDECORATION=0 \
+    calamares -d >> "$LOG" 2>&1

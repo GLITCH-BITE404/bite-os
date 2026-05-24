@@ -1,0 +1,268 @@
+#!/bin/bash
+# rice — BITE-OS rice manager. Save/load whole-config snapshots reversibly.
+#
+# Vault layout:
+#   ~/.local/share/bite-os/rices/<name>/config/...   (mirrors ~/.config tree)
+#   ~/.local/share/bite-os/rices/<name>/manifest.txt (list of dirs in this rice)
+#   ~/.local/share/bite-os/rices/.active             (name of active rice)
+#   ~/.local/share/bite-os/rices/_autobackup/<ts>/   (auto pre-swap backups)
+#
+# Safety contract:
+#   - `load` ALWAYS auto-snapshots current state into _autobackup/<timestamp>/
+#     before doing anything. Old files are moved, not deleted.
+#   - `save` refuses to overwrite an existing rice without --force.
+#   - `wipe` and any destructive op require explicit confirmation.
+#   - Default managed dirs are conservative (hypr, quickshell, caelestia, foot).
+#   - Anything not in MANAGED_DIRS is never touched.
+
+set -euo pipefail
+
+ROOT="${HOME}/.local/share/bite-os/rices"
+SRC="${HOME}/.local/share/bite-os/vault-src"
+ACTIVE_FILE="${ROOT}/.active"
+AUTOBACK="${ROOT}/_autobackup"
+APP="BITE-OS"
+
+# Dirs the switcher considers part of a "rice". Anything outside this list is
+# left alone forever. Edit cautiously.
+MANAGED_DIRS=(
+    ".config/hypr"
+    ".config/quickshell"
+    ".config/caelestia"
+    ".config/foot"
+    ".config/matugen"
+    ".config/rofi"
+    ".config/cava"
+)
+
+mkdir -p "$ROOT" "$AUTOBACK" "$SRC"
+
+c_red=$'\e[31m'; c_grn=$'\e[32m'; c_ylw=$'\e[33m'; c_dim=$'\e[2m'; c_rst=$'\e[0m'
+say()  { printf '%s\n' "$*"; }
+ok()   { printf '%s✓%s %s\n' "$c_grn" "$c_rst" "$*"; }
+warn() { printf '%s!%s %s\n' "$c_ylw" "$c_rst" "$*"; }
+err()  { printf '%s✗%s %s\n' "$c_red" "$c_rst" "$*" >&2; }
+ts()   { date +%Y%m%d-%H%M%S; }
+
+active_name() { [[ -f "$ACTIVE_FILE" ]] && cat "$ACTIVE_FILE" || echo "(none)"; }
+
+# Copy ~/.config/<rel> into <dest>/<rel> preserving structure.
+# Source missing -> skip silently (not every rice has every dir).
+copy_in() {
+    local rel="$1" dest="$2"
+    local from="${HOME}/${rel}"
+    [[ -e "$from" || -L "$from" ]] || return 0
+    mkdir -p "$(dirname "${dest}/${rel}")"
+    cp -a "$from" "${dest}/${rel}"
+}
+
+# Mirror <src>/<rel> -> ~/<rel>. If ~/<rel> exists, it must already have been
+# moved to autobackup by the caller — we never overwrite blindly.
+restore_out() {
+    local rel="$1" src="$2"
+    local from="${src}/${rel}"
+    local to="${HOME}/${rel}"
+    [[ -e "$from" || -L "$from" ]] || return 0
+    mkdir -p "$(dirname "$to")"
+    # Defensive: park_current should have cleared the target, but a stray
+    # broken symlink could still exist. Remove before cp so we never error
+    # on "cannot overwrite non-directory".
+    [[ -e "$to" || -L "$to" ]] && rm -rf "$to"
+    cp -a "$from" "$to"
+}
+
+# Move current ~/.config dirs into a timestamped autobackup. Returns the path.
+autobackup() {
+    local label="${1:-pre-swap}"
+    local stamp; stamp="$(ts)"
+    local dir="${AUTOBACK}/${stamp}-${label}"
+    mkdir -p "$dir"
+    local copied=0
+    for rel in "${MANAGED_DIRS[@]}"; do
+        local from="${HOME}/${rel}"
+        if [[ -e "$from" || -L "$from" ]]; then
+            mkdir -p "$(dirname "${dir}/${rel}")"
+            cp -a "$from" "${dir}/${rel}"
+            copied=$((copied+1))
+        fi
+    done
+    printf '%s\n' "${MANAGED_DIRS[@]}" > "${dir}/manifest.txt"
+    say "$c_dim  autobackup: $dir ($copied dirs)$c_rst"
+    printf '%s' "$dir"
+}
+
+# Move (not copy) ~/<rel> into the autobackup, leaving the spot empty for
+# the new rice to drop in. Done as a rename so it's atomic + fast.
+park_current() {
+    local park="$1"
+    mkdir -p "$park"
+    for rel in "${MANAGED_DIRS[@]}"; do
+        local from="${HOME}/${rel}"
+        if [[ -e "$from" || -L "$from" ]]; then
+            mkdir -p "$(dirname "${park}/${rel}")"
+            mv "$from" "${park}/${rel}"
+        fi
+    done
+}
+
+cmd_list() {
+    local active; active="$(active_name)"
+    say "Rices in vault:"
+    local found=0
+    for d in "$ROOT"/*/; do
+        [[ -d "$d" ]] || continue
+        local name; name="$(basename "$d")"
+        [[ "$name" == _* || "$name" == ".*" ]] && continue
+        found=1
+        if [[ "$name" == "$active" ]]; then
+            printf '  %s● %s%s  %s(active)%s\n' "$c_grn" "$name" "$c_rst" "$c_dim" "$c_rst"
+        else
+            printf '  ○ %s\n' "$name"
+        fi
+    done
+    [[ "$found" -eq 0 ]] && say "  (vault is empty — run \`rice save <name>\`)"
+    say ""
+    say "Active: ${active}"
+    say "Autobackups: $(ls "$AUTOBACK" 2>/dev/null | wc -l) snapshots in ${AUTOBACK/$HOME/~}"
+}
+
+cmd_current() { active_name; }
+
+cmd_save() {
+    local name="${1:-}" force=0
+    [[ "${2:-}" == "--force" ]] && force=1
+    [[ -z "$name" ]] && { err "usage: rice save <name> [--force]"; exit 2; }
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || { err "name must be [a-zA-Z0-9_-]+"; exit 2; }
+    local dest="${ROOT}/${name}"
+    if [[ -d "$dest" && "$force" -eq 0 ]]; then
+        err "rice '$name' already exists. Use --force or pick another name."
+        exit 1
+    fi
+    if [[ -d "$dest" && "$force" -eq 1 ]]; then
+        # don't delete — move aside.
+        local aside="${ROOT}/_replaced/${name}-$(ts)"
+        mkdir -p "$(dirname "$aside")"
+        mv "$dest" "$aside"
+        warn "previous '$name' moved to ${aside/$HOME/~}"
+    fi
+    mkdir -p "$dest"
+    local copied=0
+    for rel in "${MANAGED_DIRS[@]}"; do
+        if [[ -e "${HOME}/${rel}" || -L "${HOME}/${rel}" ]]; then
+            copy_in "$rel" "$dest"
+            copied=$((copied+1))
+        fi
+    done
+    printf '%s\n' "${MANAGED_DIRS[@]}" > "${dest}/manifest.txt"
+    echo "saved=$(ts)" > "${dest}/meta.txt"
+    ok "saved rice '$name' ($copied dirs) → ${dest/$HOME/~}"
+}
+
+cmd_load() {
+    local name="${1:-}"
+    [[ -z "$name" ]] && { err "usage: rice load <name>"; exit 2; }
+    local src="${ROOT}/${name}"
+    [[ -d "$src" ]] || { err "no such rice: $name (try \`rice list\`)"; exit 1; }
+
+    local active; active="$(active_name)"
+    if [[ "$active" == "$name" ]]; then
+        warn "'$name' is already active. Reloading anyway."
+    fi
+
+    say "Loading rice: ${c_grn}${name}${c_rst}"
+    say "  step 1/3  autobackup current state…"
+    local park; park="$(autobackup "before-load-${name}")"
+
+    say "  step 2/3  move current managed dirs aside…"
+    park_current "$park"
+
+    say "  step 3/3  install '${name}'…"
+    local installed=0
+    for rel in "${MANAGED_DIRS[@]}"; do
+        if [[ -e "${src}/${rel}" ]]; then
+            restore_out "$rel" "$src"
+            installed=$((installed+1))
+        fi
+    done
+
+    echo "$name" > "$ACTIVE_FILE"
+    ok "loaded '$name' ($installed dirs restored)"
+    say ""
+    say "  Old config preserved at: ${c_dim}${park/$HOME/~}${c_rst}"
+    say "  Undo with: ${c_grn}rice rollback${c_rst}"
+    say "  Apply changes:  ${c_dim}hyprctl reload && pkill -x qs && nohup caelestia shell -d &${c_rst}"
+
+    notify-send -a "$APP" -i "applications-graphics" \
+        "Rice loaded: ${name}" \
+        "Old config preserved. \`rice rollback\` to revert." 2>/dev/null || true
+}
+
+cmd_rollback() {
+    # Most recent autobackup wins.
+    local last; last="$(ls -1dt "$AUTOBACK"/*/ 2>/dev/null | head -1)"
+    [[ -z "$last" ]] && { err "no autobackups to roll back to"; exit 1; }
+    say "Rolling back from: ${last/$HOME/~}"
+    say "  step 1/2  re-autobackup current (broken?) state…"
+    autobackup "before-rollback" >/dev/null
+    say "  step 2/2  remove current managed dirs and restore old…"
+    for rel in "${MANAGED_DIRS[@]}"; do
+        [[ -e "${HOME}/${rel}" ]] && rm -rf "${HOME}/${rel}"
+        if [[ -e "${last}/${rel}" ]]; then
+            mkdir -p "$(dirname "${HOME}/${rel}")"
+            cp -a "${last}/${rel}" "${HOME}/${rel}"
+        fi
+    done
+    # active name is unclear after rollback — clear it
+    rm -f "$ACTIVE_FILE"
+    ok "rolled back. Active rice unset (was '$last')."
+    say "  Apply: ${c_dim}hyprctl reload && pkill -x qs && nohup caelestia shell -d &${c_rst}"
+}
+
+cmd_diff() {
+    local name="${1:-}"
+    [[ -z "$name" ]] && { err "usage: rice diff <name>"; exit 2; }
+    local src="${ROOT}/${name}"
+    [[ -d "$src" ]] || { err "no such rice: $name"; exit 1; }
+    say "diff: current  vs  rice '$name'"
+    for rel in "${MANAGED_DIRS[@]}"; do
+        if [[ -e "${HOME}/${rel}" && -e "${src}/${rel}" ]]; then
+            local n; n="$(diff -rq "${HOME}/${rel}" "${src}/${rel}" 2>/dev/null | wc -l)"
+            [[ "$n" -gt 0 ]] && printf '  ~ %-30s  %s differences\n' "$rel" "$n"
+        elif [[ -e "${HOME}/${rel}" ]]; then
+            printf '  + %-30s  only in current\n' "$rel"
+        elif [[ -e "${src}/${rel}" ]]; then
+            printf '  - %-30s  only in rice\n' "$rel"
+        fi
+    done
+}
+
+cmd_help() {
+    cat <<EOF
+${c_grn}rice${c_rst} — BITE-OS rice manager (safe config-swap)
+
+  rice list                  Show vault contents + active rice
+  rice current               Print active rice name
+  rice save <name> [--force] Snapshot current ~/.config into vault
+  rice load <name>           Swap to <name> (auto-backs-up current first)
+  rice rollback              Undo most recent load
+  rice diff <name>           Compare current state to vault rice
+  rice help                  This message
+
+Managed dirs (everything else is left untouched):
+$(printf '  %s\n' "${MANAGED_DIRS[@]}")
+
+Vault: ${ROOT/$HOME/~}
+Autobackups: ${AUTOBACK/$HOME/~}
+EOF
+}
+
+case "${1:-help}" in
+    list|ls)       shift; cmd_list      "$@" ;;
+    current|now)   shift; cmd_current   "$@" ;;
+    save)          shift; cmd_save      "$@" ;;
+    load|swap|use) shift; cmd_load      "$@" ;;
+    rollback|undo) shift; cmd_rollback  "$@" ;;
+    diff)          shift; cmd_diff      "$@" ;;
+    help|--help|-h) cmd_help ;;
+    *) err "unknown command: $1"; cmd_help; exit 2 ;;
+esac

@@ -1,0 +1,72 @@
+# Maintainer: GLITCH-BITE404 <virnikrephael@gmail.com>
+#
+# bite-os — the identity, branding, rice and tooling layer that turns a
+# CachyOS base into BITE-OS. Installing this one package pulls the whole
+# desktop and drops every BITE-OS file into place. Built from scratch for
+# BITE-OS — no CachyOS PKGBUILD was forked.
+#
+# Build:   makepkg -si      (run from this directory)
+# The payload/ tree next to this file holds the actual files (see layout below).
+
+pkgname=bite-os
+pkgver=1.0
+pkgrel=1
+pkgdesc="BITE-OS — identity, branding, rice system and tooling (CachyOS-based)"
+arch=('any')
+url="https://tiktok.com/@glitchbite404"
+license=('GPL3')
+
+# Installing bite-os pulls the entire desktop:
+depends=(
+    'hyprland' 'quickshell-git' 'sddm' 'plymouth' 'matugen' 'awww'
+    'fastfetch' 'kitty' 'nwg-dock-hyprland' 'xdg-desktop-portal-hyprland'
+    'caelestia-shell' 'caelestia-cli' 'jq' 'curl' 'playerctl' 'swayosd'
+    'cliphist' 'hypridle'
+)
+
+# These BITE-OS files replace whatever CachyOS shipped:
+conflicts=()
+provides=("bite-os-branding")
+backup=('etc/sddm.conf.d/10-bite-os.conf')
+install="bite-os.install"
+
+# payload/ layout (stage these next session — they all exist on the system,
+# the MANIFEST.md says exactly where to copy each from):
+#   payload/bin/        -> /usr/bin/         (bite-os-rebrand, -fix-boot, -fix-fastfetch)
+#   payload/hooks/      -> /usr/share/libalpm/hooks/   (zz-bite-os-*.hook, paths -> /usr/bin)
+#   payload/branding/   -> /usr/share/bite-os/         (os-release, lsb-release, issue)
+#   payload/plymouth/   -> /usr/share/plymouth/themes/ (bite-os, glitch-os)
+#   payload/sddm-theme/ -> /usr/share/sddm/themes/bite-os/
+#   payload/sddm-conf/  -> /etc/sddm.conf.d/10-bite-os.conf
+#   payload/skel/       -> /etc/skel/        (.config/glitch, .config/hypr, the rices
+#                                             vault, the healthcheck service, etc.)
+
+package() {
+    cd "$srcdir/../payload"
+
+    # --- system tooling ---
+    install -d "$pkgdir/usr/bin"
+    install -m755 bin/bite-os-rebrand        "$pkgdir/usr/bin/"
+    install -m755 bin/bite-os-fix-boot       "$pkgdir/usr/bin/"
+    install -m755 bin/bite-os-fix-fastfetch  "$pkgdir/usr/bin/"
+
+    # --- pacman hooks (zz- so they run AFTER cachyos and win) ---
+    install -d "$pkgdir/usr/share/libalpm/hooks"
+    install -m644 hooks/*.hook "$pkgdir/usr/share/libalpm/hooks/"
+
+    # --- branding source files ---
+    install -d "$pkgdir/usr/share/bite-os"
+    install -m644 branding/os-release  "$pkgdir/usr/share/bite-os/"
+    install -m644 branding/lsb-release "$pkgdir/usr/share/bite-os/"
+    install -m644 branding/issue       "$pkgdir/usr/share/bite-os/"
+
+    # --- boot splash + login themes ---
+    cp -a plymouth/.   "$pkgdir/usr/share/plymouth/themes/" 2>/dev/null || true
+    install -d "$pkgdir/usr/share/sddm/themes"
+    cp -a sddm-theme   "$pkgdir/usr/share/sddm/themes/bite-os"
+    install -Dm644 sddm-conf/10-bite-os.conf "$pkgdir/etc/sddm.conf.d/10-bite-os.conf"
+
+    # --- default user environment: every new user gets the full rice ---
+    install -d "$pkgdir/etc/skel"
+    cp -a skel/.  "$pkgdir/etc/skel/"
+}

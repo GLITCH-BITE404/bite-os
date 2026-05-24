@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=BITE-OS Hyprland
+Comment=Hyprland with BITE-OS live-session fixup
+Exec=/usr/local/bin/bite-os-hyprland-session
+Type=Application
+DesktopNames=Hyprland
+Keywords=tiling;wayland;compositor;bite-os;

@@ -1,0 +1,19 @@
+[Unit]
+Description=BITE-OS live environment setup
+# Must run AFTER the filesystem is fully ready (incl. overlay copy-up) and
+# BEFORE any login manager touches /home/bite.
+After=local-fs.target systemd-tmpfiles-setup.service
+Before=sddm.service display-manager.service systemd-user-sessions.service
+DefaultDependencies=no
+ConditionKernelCommandLine=archisobasedir
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bite-os-live-setup
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=yes
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target sysinit.target

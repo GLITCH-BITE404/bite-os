@@ -1,0 +1,14 @@
+app2unit
+caelestia-cli
+caelestia-shell
+geocode-glib-2
+geocode-glib-common
+hyprshade
+hyprwayland-scanner-git
+libcava
+mpvpaper
+python-materialyoucolor
+python-pywalfox
+qtengine-git
+ttf-rubik-vf
+swaylock-effects-git
