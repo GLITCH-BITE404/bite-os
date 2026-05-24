@@ -31,4 +31,7 @@ file_permissions=(
   ["/usr/local/bin/install-bite-os"]="0:0:755"
   ["/usr/local/bin/bite-os-hyprland-session"]="0:0:755"
   ["/usr/local/bin/bite-os-launch-installer"]="0:0:755"
+  ["/usr/local/bin/bite-os-installer-session"]="0:0:755"
+  ["/usr/local/bin/bite-os-kiosk"]="0:0:755"
+  ["/usr/local/bin/bite-os-firstboot-cleanup"]="0:0:755"
 )

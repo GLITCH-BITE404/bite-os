@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — remove live-installer remnants on the installed system ━━━
+# The whole squashfs (including the live installer kiosk autologin + session)
+# gets copied to disk by Calamares. This runs ONCE on the first boot of the
+# INSTALLED system (it's gated to NOT run on the live ISO) and deletes those
+# live-only files, then disables itself, so the installed system boots like a
+# normal OS into the real BITE-OS desktop.
+set -u
+
+rm -f /etc/sddm.conf.d/99-bite-os-autologin.conf \
+      /etc/sddm.conf.d/00-live-autologin.conf \
+      /usr/share/wayland-sessions/bite-os-install.desktop \
+      /usr/local/bin/bite-os-installer-session \
+      /usr/local/bin/bite-os-kiosk \
+      /etc/sudoers.d/00-bite-live 2>/dev/null || true
+
+# Make sure the display manager is enabled for the installed system.
+systemctl enable sddm.service 2>/dev/null || true
+
+# Never run again.
+systemctl disable bite-os-firstboot-cleanup.service 2>/dev/null || true
+rm -f /etc/systemd/system/multi-user.target.wants/bite-os-firstboot-cleanup.service 2>/dev/null || true
+exit 0

@@ -1,57 +1,105 @@
 #!/usr/bin/env bash
 # ━━━ BITE-OS — archiso build-time customisation ━━━
-# Runs inside the airootfs chroot once, after pacstrap has installed every
-# package. We use this hook to create the live `bite` user and populate its
-# home from /etc/skel HERE, at build time — single-threaded, no SDDM racing
-# us, /etc/skel is guaranteed-complete because pacstrap already finished.
-#
-# Why not do this at boot in bite-os-live-setup? Because at boot the skel
-# copy has raced with SDDM autologin multiple times, leaving an incomplete
-# /home/bite/ → Hyprland falls back to its rescue config. Doing it here
-# bakes a correct home directly into the squashfs.
+# Runs inside the airootfs chroot once, after pacstrap. Sets up the LIVE ISO as
+# a dedicated Calamares installer kiosk: it autologins the `bite` user and cage
+# runs the installer fullscreen. No Hyprland/caelestia in the live session, so
+# nothing can crash and hijack it. The full rice ships untouched in /etc/skel,
+# so users INSTALLED to disk get the real BITE-OS desktop.
 set -uo pipefail
 echo "[customize_airootfs] start"
 
-# 1. User + groups + passwords
+# 1. Live user + creds (bite/bite, root/bite). bite just needs to exist so the
+#    kiosk autologin works; its home content is irrelevant (cage ignores it).
 if ! id bite &>/dev/null; then
     useradd -m -u 1000 -G wheel,video,audio,network,storage,input,lp -s /bin/bash bite
 fi
 echo 'bite:bite' | chpasswd
 echo 'root:bite' | chpasswd
 
-# 2. Force-sync /etc/skel into /home/bite — useradd already did this, but
-#    re-run idempotently in case any postinst hooks updated skel after the
-#    initial copy.
-if [ -d /etc/skel ]; then
-    cp -an /etc/skel/. /home/bite/ 2>/dev/null || true
-fi
-chown -R bite:bite /home/bite
+# 2. Belt-and-suspenders: the live `bite` home was seeded from /etc/skel (the
+#    full rice). The kiosk never reads it, but strip the self-repair service +
+#    caelestia autostart so nothing can possibly spawn caelestia in the live
+#    session. /etc/skel itself stays untouched, so installs are unaffected.
+rm -rf /home/bite/.config/systemd/user/graphical-session.target.wants/bite-os-healthcheck.service \
+       /home/bite/.config/systemd/user/*/bite-os-healthcheck.service \
+       /home/bite/.config/hypr \
+       /home/bite/.config/quickshell \
+       /home/bite/.config/caelestia 2>/dev/null || true
+chown -R bite:bite /home/bite 2>/dev/null || true
 
-# 3. Passwordless sudo for the live session ONLY. Calamares wipes
-#    /etc/sudoers.d/ when configuring the installed system, so this file
-#    doesn't leak into the install.
+# 3. Passwordless sudo so the kiosk can launch Calamares as root. This file is
+#    removed on the installed system by bite-os-firstboot-cleanup.
 install -d -m 0750 /etc/sudoers.d
 cat > /etc/sudoers.d/00-bite-live <<'EOF'
 bite ALL=(ALL) NOPASSWD: ALL
 EOF
 chmod 440 /etc/sudoers.d/00-bite-live
 
-# 4. Auto-start the installer in the live session only — this .desktop goes
-#    into the live user's home, not /etc/skel, so installed users never
-#    autostart the installer.
-if [ -f /usr/share/applications/install-bite-os.desktop ]; then
-    install -d -o bite -g bite /home/bite/.config/autostart
-    cp /usr/share/applications/install-bite-os.desktop \
-       /home/bite/.config/autostart/
-    chown bite:bite /home/bite/.config/autostart/install-bite-os.desktop
+# 3. Make Calamares do an OFFLINE install of BITE-OS.
+#    cachyos' default settings.conf is an ONLINE netinstall: it pacstraps
+#    vanilla CachyOS + a DE you pick from a menu — it would NOT install our
+#    rice. The offline variant copies THIS live squashfs (the full riced
+#    BITE-OS) to disk via unpackfs, with no desktop/bootloader chooser. That is
+#    exactly what BITE-OS is: one opinionated, pre-riced Hyprland system.
+if [ -f /usr/share/calamares/settings_offline.conf ]; then
+    cp -f /usr/share/calamares/settings_offline.conf /usr/share/calamares/settings.conf
+    echo "[customize_airootfs] calamares set to OFFLINE install (unpackfs of the live system)"
 fi
 
-# 5. Sanity check — fail the build loudly if the critical config didn't land.
-if [ ! -s /home/bite/.config/hypr/hyprland.conf ]; then
-    echo "[customize_airootfs] FATAL: /home/bite/.config/hypr/hyprland.conf missing or empty after skel copy" >&2
-    echo "[customize_airootfs] /etc/skel contents:" >&2
-    ls -la /etc/skel/.config/hypr/ 2>&1 >&2 || true
+# Brand every settings variant to bite-os (our branding dir ships alongside).
+for f in /usr/share/calamares/settings.conf \
+         /usr/share/calamares/settings_offline.conf \
+         /usr/share/calamares/settings_online.conf \
+         /etc/calamares/settings.conf; do
+    [ -f "$f" ] || continue
+    if grep -q '^branding:' "$f"; then
+        sed -i -E 's/^branding:.*/branding: bite-os/' "$f"
+    else
+        echo 'branding: bite-os' >> "$f"
+    fi
+done
+echo "[customize_airootfs] calamares rebranded to bite-os"
+
+# The offline 'removeuser' step deletes the live user after copy; point it at
+# our live user 'bite' (cachyos defaults to 'liveuser').
+if [ -f /etc/calamares/modules/removeuser.conf ]; then
+    sed -i -E 's/^username:.*/username: bite/' /etc/calamares/modules/removeuser.conf
+fi
+
+# Put the BITE-OS wolf on the GRUB boot screen (the offline install uses GRUB
+# with the cachyos theme; swap its background image for ours).
+GRUB_THEME=/usr/share/grub/themes/cachyos
+if [ -d "$GRUB_THEME" ] && [ -f /usr/share/backgrounds/bite-os/wolf_logo.png ]; then
+    for bg in "$GRUB_THEME"/background.png "$GRUB_THEME"/*.png; do
+        [ -f "$bg" ] || continue
+        cp -f /usr/share/backgrounds/bite-os/wolf_logo.png "$bg"
+    done
+    echo "[customize_airootfs] GRUB theme rebranded with BITE-OS wolf"
+fi
+
+# 4. Sanity checks — fail the build loudly if a critical piece is missing.
+for f in /usr/bin/cage /usr/local/bin/bite-os-installer-session \
+         /usr/local/bin/bite-os-kiosk \
+         /usr/share/wayland-sessions/bite-os-install.desktop \
+         /etc/sddm.conf.d/99-bite-os-autologin.conf; do
+    [ -e "$f" ] || { echo "[customize_airootfs] FATAL: missing $f" >&2; exit 1; }
+done
+command -v calamares >/dev/null || { echo "[customize_airootfs] FATAL: calamares not installed" >&2; exit 1; }
+if [ ! -s /etc/skel/.config/hypr/hyprland.conf ]; then
+    echo "[customize_airootfs] FATAL: /etc/skel rice missing — installed users won't get BITE-OS" >&2
     exit 1
 fi
 
-echo "[customize_airootfs] done. /home/bite populated, $(find /home/bite -type f | wc -l) files."
+# 5. cachyos shipped Calamares 3.4.1-8 linked against Boost 1.89 but bumped the
+#    repos to Boost 1.91 without rebuilding it, so calamares can't find
+#    libboost_python314.so.1.89.0. We bundle the Boost 1.89 .so files (in
+#    /usr/lib via the airootfs overlay) alongside 1.91; regenerate the linker
+#    cache so calamares finds them.
+if ls /usr/lib/libboost_python314.so.1.89.0 >/dev/null 2>&1; then
+    ldconfig
+    echo "[customize_airootfs] Boost 1.89 compat libs present; ldconfig refreshed"
+else
+    echo "[customize_airootfs] WARN: Boost 1.89 compat libs missing — calamares may not start" >&2
+fi
+
+echo "[customize_airootfs] done — live ISO is a Calamares kiosk; /etc/skel rice intact for installs."

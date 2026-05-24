@@ -49,6 +49,7 @@ package() {
     install -m755 bin/bite-os-rebrand        "$pkgdir/usr/bin/"
     install -m755 bin/bite-os-fix-boot       "$pkgdir/usr/bin/"
     install -m755 bin/bite-os-fix-fastfetch  "$pkgdir/usr/bin/"
+    install -m755 bin/bite-os-update         "$pkgdir/usr/bin/"
 
     # --- pacman hooks (zz- so they run AFTER cachyos and win) ---
     install -d "$pkgdir/usr/share/libalpm/hooks"
@@ -59,6 +60,7 @@ package() {
     install -m644 branding/os-release  "$pkgdir/usr/share/bite-os/"
     install -m644 branding/lsb-release "$pkgdir/usr/share/bite-os/"
     install -m644 branding/issue       "$pkgdir/usr/share/bite-os/"
+    install -m644 branding/AUTHORSHIP  "$pkgdir/usr/share/bite-os/"
 
     # --- boot splash + login themes ---
     cp -a plymouth/.   "$pkgdir/usr/share/plymouth/themes/" 2>/dev/null || true

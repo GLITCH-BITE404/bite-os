@@ -29,6 +29,7 @@ BITE-OS isn't a reskin. It ships things stock Arch and CachyOS simply don't have
 - **🦷 Dot-switch** — two *complete* desktops (`caelestia` + `ilyamiro`), swapped with **one keypress**. Every swap auto-backs-up your config, and a 30-second watchdog auto-reverts if anything breaks. You physically cannot get locked out.
 - **⚙ Live GUI settings** — keybinds, language, weather, startup apps and dot-switching — all editable from an in-system panel. No text files. Configs recompile and reload instantly.
 - **🛠 Self-repair** — a health check runs at every login and rebuilds a wiped config automatically. The OS fixes itself.
+- **⬆ One-key update** — `SUPER+U` runs a full system update (kernel, apps, AUR, rice) that **keeps it BITE-OS** — branding is re-asserted on every upgrade, so it never decays into vanilla CachyOS.
 - **⚡ Fast** — a full heavy glitch/DEDSEC rice that idles around **5% CPU** and holds **144 fps**. Performance is the whole point.
 - **🌐 Keyless weather, glitch borders, animated everything** — and it still doesn't lag.
 
@@ -47,25 +48,33 @@ The system maps directly to these custom core inputs for elite navigation:
 | `SUPER + BACKSPACE` | **Hot-Swap to Ilyamiro** | Executes a rapid swap directly to the `ilyamiro` dots profile |
 | `CTRL + SUPER + D` | **Hot-Swap to Caelestia** | Executes a rapid swap straight back to the `caelestia` dots profile |
 | `SUPER + R` | **Reload Waybar** | Instantly recompiles and hot-reloads the Waybar panel |
+| `SUPER + U` | **Update BITE-OS** | Full system update (kernel, apps, rice) with logs — stays BITE-OS |
 
 ---
 
 ## ◈ Download
 
-> The ISO (~5 GB) is hosted off-GitHub due to file-size limits.
+> The ISO (~4.8 GB) is hosted off-GitHub due to file-size limits.
 
-**➡ [Download BITE-OS 1.0 (dedsec)](https://archive.org/download/bite-os-1.0-x86_64_20260520/bite-os-1.0-x86_64.iso)**
+**➡ [Download BITE-OS 1.0 (dedsec)](https://archive.org/download/bite-os-1.0-x86_64_20260524/bite-os-1.0-x86_64.iso)**
 
-`SHA256`: `64f67306b6e848baacf7a4feb20062b74ea8faa238e5aca87c276521f2bda052`
+`SHA256`: `5d8f789d3761317a804cc0eeb46947f7c0cd5d3aaff6d2f13d59794b91488add`
 
 ## ◈ Install
 
 1. Flash the ISO to a USB (≥ 8 GB) with [Impression](https://apps.gnome.org/Impression/), [Ventoy](https://www.ventoy.net/), or `dd`.
-2. Boot it. BITE-OS comes up as a **live environment** and logs you straight into the desktop. (If a login screen ever appears: user **`bite`**, password **`bite`**.)
-3. Open **Install BITE-OS** (the graphical installer) — click through it: language → disk → *your* username + password → install.
-4. Reboot into your own riced BITE-OS.
+2. Boot it. The ISO comes up **straight into the BITE-OS installer** — a dedicated, bulletproof installer environment (no desktop to fight, nothing to crash).
+3. Click through it: language → keyboard → disk → *your* username + password → **Install**.
+4. Reboot into your own riced BITE-OS — the full pre-riced Hyprland desktop, exactly as shipped.
 
-No terminal required.
+No terminal required, no desktop to pick — BITE-OS installs as **one opinionated, pre-riced Hyprland system**, offline (no internet needed during install).
+
+## ◈ Updating
+
+BITE-OS keeps itself current **and stays BITE-OS** — updates never revert it to vanilla CachyOS.
+
+- Press **`SUPER + U`**, or launch **Update BITE-OS** from the app menu, or run **`bite-os-update`** in a terminal.
+- It updates *everything* (kernel, apps, AUR, the rice), is **optional** (asks first, only acts if there's something to do), and **logs** every run to `~/.local/state/bite-os/`.
 
 ## ◈ Source
 

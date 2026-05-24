@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Install BITE-OS
+Comment=BITE-OS live installer kiosk (Calamares)
+Exec=/usr/local/bin/bite-os-installer-session
+Type=Application
+DesktopNames=cage

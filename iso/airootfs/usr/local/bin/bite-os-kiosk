@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — what runs inside the cage kiosk ━━━
+# The live session autologins as `bite` and cage runs this fullscreen. Calamares
+# needs root, so we let root use cage's (single, simple) Wayland socket and
+# launch it with passwordless sudo. If Calamares exits or fails we drop to a
+# terminal instead of a black screen, so the kiosk is never a dead loop.
+set -u
+LOG=/tmp/calamares.log
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+WAYLAND="${WAYLAND_DISPLAY:-wayland-0}"
+echo "── $(date '+%F %T') kiosk uid=$(id -u) runtime=$RUNTIME wayland=$WAYLAND ──" > "$LOG"
+
+# Wait for cage to publish its Wayland socket.
+for i in $(seq 1 20); do
+    [ -S "$RUNTIME/$WAYLAND" ] && break
+    sleep 0.25
+done
+
+# Let root connect to the live user's compositor socket.
+setfacl -m u:root:rw  "$RUNTIME/$WAYLAND" 2>>"$LOG" || chmod a+rw  "$RUNTIME/$WAYLAND" 2>>"$LOG" || true
+setfacl -m u:root:rwx "$RUNTIME"          2>>"$LOG" || chmod a+rwx "$RUNTIME"          2>>"$LOG" || true
+
+if command -v calamares >/dev/null 2>&1; then
+    sudo -n -E env \
+        HOME=/root \
+        XDG_RUNTIME_DIR="$RUNTIME" \
+        WAYLAND_DISPLAY="$WAYLAND" \
+        XDG_SESSION_TYPE=wayland \
+        QT_QPA_PLATFORM="wayland;xcb" \
+        calamares -d >> "$LOG" 2>&1
+    echo "calamares exited with status $?" >> "$LOG"
+else
+    echo "FATAL: calamares not found" >> "$LOG"
+fi
+
+# Never strand the user on a black screen.
+for term in kitty alacritty foot; do
+    command -v "$term" >/dev/null 2>&1 && exec "$term"
+done
+exec sleep infinity

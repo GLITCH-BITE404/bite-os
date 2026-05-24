@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# ━━━ BITE-OS — live installer kiosk session ━━━
+# SDDM autologin (Session=bite-os-install) runs THIS as the live session.
+# `cage` is a single-application Wayland kiosk: it brings up a compositor and
+# runs ONE program fullscreen — here, the Calamares installer. No Hyprland, no
+# rice, no caelestia, nothing that can crash and hijack the screen.
+exec cage -s -d -- /usr/local/bin/bite-os-kiosk

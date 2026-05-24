@@ -113,8 +113,6 @@ libopenraw
 libva-utils
 linux-cachyos
 linux-cachyos-headers
-linux-cachyos-lts
-linux-cachyos-lts-headers
 linux-firmware
 logrotate
 loupe
@@ -268,3 +266,6 @@ yaml-cpp-0.8
 xorg-xhost
 caelestia-shell
 caelestia-cli
+# --- live installer kiosk: boot straight into Calamares, no Hyprland ---
+cage
+acl

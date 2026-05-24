@@ -1,0 +1,14 @@
+[Unit]
+Description=BITE-OS first-boot cleanup (remove live installer remnants)
+# Only on the INSTALLED system: archisobasedir is present on the live ISO, so
+# negating it means this unit never runs while booted from the ISO.
+ConditionKernelCommandLine=!archisobasedir
+ConditionPathExists=/etc/sddm.conf.d/99-bite-os-autologin.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bite-os-firstboot-cleanup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
