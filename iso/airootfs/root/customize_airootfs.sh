@@ -77,6 +77,31 @@ if [ -d "$GRUB_THEME" ] && [ -f /usr/share/backgrounds/bite-os/wolf_logo.png ]; 
     echo "[customize_airootfs] GRUB theme rebranded with BITE-OS wolf"
 fi
 
+# Wire the [bite-os] UPDATE repo — but ONLY if a signing key has been set up
+# (repo/setup-signing.sh ships bite-os-repo.pub here). This lets installed
+# systems pull rice updates you publish, with signature verification so nobody
+# can push fake BITE-OS packages. If no key is present, this is skipped entirely
+# so the OS just tracks CachyOS upstream as before.
+REPO_PUBKEY=/usr/share/bite-os/bite-os-repo.pub
+if [ -s "$REPO_PUBKEY" ]; then
+    pacman-key --add "$REPO_PUBKEY" 2>/dev/null || true
+    FPR="$(gpg --with-colons --show-keys "$REPO_PUBKEY" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')"
+    [ -n "$FPR" ] && pacman-key --lsign-key "$FPR" 2>/dev/null || true
+    if ! grep -q '^\[bite-os\]' /etc/pacman.conf; then
+        cat >> /etc/pacman.conf <<'EOF'
+
+# BITE-OS rice updates (signed) — delivers GLITCH-BITE404's own changes,
+# on top of the normal CachyOS/Arch upstream.
+[bite-os]
+SigLevel = Required
+Server = https://github.com/GLITCH-BITE404/BITE-OS/releases/download/repo
+EOF
+    fi
+    echo "[customize_airootfs] [bite-os] signed update repo wired + key trusted"
+else
+    echo "[customize_airootfs] no repo signing key — skipping [bite-os] update repo (CachyOS-only updates)"
+fi
+
 # 4. Sanity checks — fail the build loudly if a critical piece is missing.
 for f in /usr/bin/cage /usr/local/bin/bite-os-installer-session \
          /usr/local/bin/bite-os-kiosk \
