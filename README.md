@@ -20,6 +20,13 @@ Built on the CachyOS base — riced to the teeth, engineered to never get in you
 
 ---
 
+> **TL;DR** — BITE-OS is a glitch-themed Linux distro on a CachyOS/Arch base: a full
+> Hyprland rice, **two swappable desktops**, self-healing config, and **one-key system
+> updates** — heavy looks, light idle. Grab the [ISO](#-download) and install in minutes.
+> Named after my Shiba Inu, [Laffy](LAFFY.md) 🐕.
+
+---
+
 ## ◈ Gallery
 
 <!-- Drop your screenshots in assets/screenshots/ with these names (see that

@@ -10,13 +10,6 @@
 
 ---
 
-> **TL;DR** — BITE-OS is a glitch-themed Linux distro: CachyOS/Arch base, a full
-> Hyprland rice, two swappable desktops, self-heal, and one-key updates. It's named
-> after my Shiba Inu, **Laffy** 🐕 — and this page is the story of how it was born
-> (short version: I bricked my system and rebuilt it into this).
-
----
-
 ## How it actually started
 
 BITE-OS wasn't planned. I was running [ML4W](https://github.com/mylinuxforwork/dotfiles)
