@@ -93,6 +93,41 @@ toggle, not a permanent cost.
 
 ---
 
+## Background system (caelestia rewrite)
+
+Stock caelestia does **image** wallpapers (swww). I **rewrote the background subsystem**
+so it does **live video** too:
+
+- A unified setter routes **images → hyprpaper** and **videos → mpvpaper**, transparently.
+- The shell's background surface **detects a video source and goes transparent** so
+  mpvpaper shows through underneath — the bar/widgets still composite on top.
+- For videos, it grabs a **still frame and feeds it to matugen**, so the whole
+  Material-You colour scheme themes itself off your *video* wallpaper, not just images.
+- State is tracked so the picker shows the right checkmark and the wallpaper **restores
+  on reboot**.
+
+---
+
+## Power modes (`glitch-power`)
+
+A from-scratch **power-profile switcher** — `saver` / `balanced` / `perf` — that I built
+to coordinate layers that normally don't know about each other, all from one toggle:
+
+- **CPU:** flips Intel turbo boost, sets the **cpupower governor** (powersave /
+  performance / schedutil) and frequency caps.
+- **System:** sets the **power-profiles-daemon** profile to match.
+- **Compositor:** toggles Hyprland-side effects for the mode.
+- **Shell:** patches caelestia's `shell.json` so the bar/drawer's **own animations and
+  transparency react too** — and does it with an **atomic write** (temp file on the same
+  filesystem + rename) so Quickshell's config-watcher can't catch a half-written JSON and
+  glitch the bar mid-switch.
+- Root knobs are wrapped in `sudo -n`, so a missing sudoers rule just no-ops instead of
+  prompting or breaking.
+
+> One tap = CPU, daemon, compositor *and* the shell's look all shift together, cleanly.
+
+---
+
 <div align="center">
 
 *More tools live in [`src/`](src/) — readable, no build step.*
