@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐕 The dog behind BITE-OS
+# 🐕 The story behind BITE-OS
 
 <img src="assets/laffy/laffy.jpg" alt="Laffy, the Shiba Inu behind BITE-OS" width="320"/>
 
@@ -10,31 +10,48 @@
 
 ---
 
-This is **Laffy** — a Shiba Inu, and the reason BITE-OS exists.
+## How it actually started
 
-It started as a project named after a wolf, made out of loving my dog. The name,
-the fangs in the logo, the whole **"BITE"** — that's not edgy hacker branding.
-It's *him.* The logo is a close-up of Laffy's mouth. **"// THE SYSTEM BIT YOU"**
-is just Laffy play-biting. The teeth were always affection.
+BITE-OS wasn't planned. I was running [ML4W](https://github.com/mylinuxforwork/dotfiles)
+dotfiles and wanted to change my desktop and my rice — and I **bricked the whole
+system** doing it. No desktop, no GUI, nothing.
 
-That's the spirit the whole OS is built on, if you look for it:
+So I fixed it the hard way: from a black **TTY**, on the CachyOS base, reprogramming
+it by hand until it booted again. When it finally came back up… it had **no GUI at
+all.** So I pulled [caelestia](https://github.com/caelestia-dots) down as a starting
+template, **reprogrammed it from there**, and just kept going — added a second full
+desktop, the dot-switch, the safety net, the branding, more and more — until it
+became its own thing: **BITE-OS.**
 
-- **Loyal** — it guards you. The self-heal, the dot-switch watchdog, the rice
-  vault: a system that won't let you get hurt, like a dog watching the house.
-- **Never a leash** — it protects you and then lets you run. Edit anything, break
-  anything, make it yours. BITE-OS gives you everything riced out of the box and
-  then gets out of your way.
+That's why this OS is the way it is. **I lived the brick.** I know exactly what it
+feels like to wreck your system at 2am and stare at a TTY. So BITE-OS is built so
+**you can't do that to yourself** — the self-heal, the auto-revert dot-switch
+watchdog, the rice vault. It catches you, because nothing caught me.
 
-A Minecraft wolf — wild, then tamed, loyal, following you anywhere but never
-leashed — is the whole arc of this project in one image. BITE-OS is that wolf,
-with Laffy's heart.
+## Where the name comes from
 
-I don't force my dog on anyone — you can theme BITE-OS into whatever you want.
-But he's always in here somewhere, watching. That's the point.
+The dog. This is **Laffy** — a Shiba Inu, and the reason it's called BITE-OS.
+
+The fangs in the logo, the whole **"BITE"** — that's not edgy branding, it's *him.*
+The logo is a close-up of Laffy's mouth. **"// THE SYSTEM BIT YOU"** is just Laffy
+play-biting. The teeth were always affection.
+
+That's the spirit underneath all the engineering:
+
+- **Loyal** — it guards you. Self-heal, watchdog, vault: a system that won't let
+  you get hurt, like a dog watching the house.
+- **Never a leash** — it protects you, then lets you run. Edit anything, break
+  anything, make it yours. Riced out of the box, then out of your way.
+
+I don't force my dog on anyone — theme BITE-OS into whatever you want. But he's
+always in here somewhere, watching. That's the point.
 
 <div align="center">
 
-<img src="assets/laffy/laffy-portrait.jpg" alt="Laffy" width="260"/>
+<img src="assets/laffy/laffy-portrait.jpg" alt="Laffy" width="220"/>
+<img src="assets/laffy/laffy-2.jpg" alt="Laffy" width="220"/>
+<img src="assets/laffy/laffy-3.jpg" alt="Laffy" width="220"/>
+<img src="assets/laffy/laffy-4.jpg" alt="Laffy" width="220"/>
 
 **Good boy. Built different.** 🐾
 
