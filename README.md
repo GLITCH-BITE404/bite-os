@@ -190,4 +190,6 @@ fonts, …) keep their own respective licenses.
 
 `// THE SYSTEM BIT YOU` — built by **GLITCH-BITE404**
 
+🐕 *Named after, and built for, a Shiba Inu named Laffy — [meet him](LAFFY.md).*
+
 </div>
