@@ -10,6 +10,13 @@
 
 ---
 
+> **TL;DR** — BITE-OS is a glitch-themed Linux distro: CachyOS/Arch base, a full
+> Hyprland rice, two swappable desktops, self-heal, and one-key updates. It's named
+> after my Shiba Inu, **Laffy** 🐕 — and this page is the story of how it was born
+> (short version: I bricked my system and rebuilt it into this).
+
+---
+
 ## How it actually started
 
 BITE-OS wasn't planned. I was running [ML4W](https://github.com/mylinuxforwork/dotfiles)
@@ -48,10 +55,12 @@ always in here somewhere, watching. That's the point.
 
 <div align="center">
 
-<img src="assets/laffy/laffy-portrait.jpg" alt="Laffy" width="220"/>
-<img src="assets/laffy/laffy-2.jpg" alt="Laffy" width="220"/>
-<img src="assets/laffy/laffy-3.jpg" alt="Laffy" width="220"/>
-<img src="assets/laffy/laffy-4.jpg" alt="Laffy" width="220"/>
+<img src="assets/laffy/laffy-5.jpg" alt="Laffy" width="340"/>
+
+<img src="assets/laffy/laffy-portrait.jpg" alt="Laffy" width="200"/>
+<img src="assets/laffy/laffy-3.jpg" alt="Laffy" width="200"/>
+<img src="assets/laffy/laffy-2.jpg" alt="Laffy" width="200"/>
+<img src="assets/laffy/laffy-4.jpg" alt="Laffy" width="200"/>
 
 **Good boy. Built different.** 🐾
 
