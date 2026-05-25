@@ -16,6 +16,8 @@ Built on the CachyOS base — riced to the teeth, engineered to never get in you
 ![Shell](https://img.shields.io/badge/desktop-Hyprland%20%2B%20Quickshell-00ff78?style=for-the-badge)
 [![License](https://img.shields.io/badge/license-GPLv3-cba6f7?style=for-the-badge)](LICENSE)
 
+**[⤓ Download](#-download)** · **[🛠 Built by hand](BUILT.md)** · **[🐕 Meet Laffy](LAFFY.md)**
+
 </div>
 
 ---
@@ -96,6 +98,44 @@ tuned, not the effects stripped. Nothing here costs you a single blur or shader.
 
 **Result:** a full glitch/DEDSEC rice that idles around **5–7% with a live video
 wallpaper** (lower still on a static one) and holds **144 fps**.
+
+---
+
+## ◈ Does it match your vibe?
+
+If your taste runs **cyber / glitch / DEDSEC-hacker** — neon-on-black, terminals that
+look like a breach in progress, fangs in the logo, animated everything — BITE-OS is
+built to feel like that **the second it boots**, no hours of ricing required. And if
+your vibe is something else entirely, it bends: two complete desktops, a live theming
+engine, and a rice vault mean you can reshape it into *yours* and never get locked out.
+It's opinionated out of the box, infinitely yours after.
+
+---
+
+## ◈ Hand-built tooling
+
+None of this is borrowed — it was written *for* BITE-OS. *(Full writeup: [`BUILT.md`](BUILT.md).)*
+
+- **`glitch-fetch`** — a from-scratch fastfetch rewrite, built as a **pure-Bash "gacha"
+  engine**: every time you open a terminal it rolls a **random logo** (Laffy, the BITE
+  fangs, glitch art), **auto-detects that image's aspect ratio**, and renders it into a
+  matching framed layout (centered / side-by-side / vertical) with a boxed, glyph-framed
+  system readout. Per-shell caching keeps each session's pick stable. No two terminals
+  look the same.
+- **`rice`** — the **rice vault**: `rice save` / `load` / `rollback`. Snapshots your
+  *entire* desktop, auto-backs-up before every swap, and reverts in one command. Your
+  setup is a versioned artifact, not fragile dotfiles you pray over.
+- **Dot-switch + watchdog** — flip between the two desktops with one key; a 30-second
+  watchdog **auto-reverts if a swap breaks**. You physically cannot lock yourself out.
+- **`bite-os-update` (`SUPER+U`)** — one-key full update (kernel / apps / AUR / rice)
+  that **re-asserts branding** every time, so updates never decay it back to vanilla
+  CachyOS. Optional, logged, asks first.
+- **Self-heal** — a login healthcheck quietly rebuilds a wiped config. The OS fixes itself.
+- **Glitch mode (`SUPER+B`)** — a LARP overlay: glitch shader, dedsec wallpaper, amber
+  trace HUD and paced popups — engages and tears down cleanly, restoring your exact state.
+- **Wallpaper engine** — single-instance VAAPI video wallpapers, an auto-pause daemon, a
+  ghost-reaper so it never stacks, and `wall-optimize` to down-rate any wallpaper for
+  lower idle CPU.
 
 ---
 
