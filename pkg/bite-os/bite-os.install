@@ -9,6 +9,11 @@ _apply() {
     if grep -qi 'cachyos' /etc/hostname 2>/dev/null; then
         echo 'bite-os' > /etc/hostname
     fi
+    # Register the BITE-OS update repo so `pacman -Syu` pulls updates from
+    # GitHub. Added once, never duplicated.
+    if [ -f /usr/share/bite-os/bite-os-repo.conf ] && ! grep -q '^\[bite-os\]' /etc/pacman.conf 2>/dev/null; then
+        printf '\n%s\n' "$(cat /usr/share/bite-os/bite-os-repo.conf)" >> /etc/pacman.conf
+    fi
 }
 
 post_install() {

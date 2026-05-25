@@ -9,7 +9,7 @@
 # The payload/ tree next to this file holds the actual files (see layout below).
 
 pkgname=bite-os
-pkgver=1.0
+pkgver=1.1
 pkgrel=1
 pkgdesc="BITE-OS — identity, branding, rice system and tooling (CachyOS-based)"
 arch=('any')
@@ -61,6 +61,7 @@ package() {
     install -m644 branding/lsb-release "$pkgdir/usr/share/bite-os/"
     install -m644 branding/issue       "$pkgdir/usr/share/bite-os/"
     install -m644 branding/AUTHORSHIP  "$pkgdir/usr/share/bite-os/"
+    install -m644 branding/bite-os-repo.conf "$pkgdir/usr/share/bite-os/"
 
     # --- boot splash + login themes ---
     cp -a plymouth/.   "$pkgdir/usr/share/plymouth/themes/" 2>/dev/null || true
