@@ -107,6 +107,16 @@ less
 lib32-mesa
 lib32-opencl-mesa
 lib32-vulkan-intel
+lib32-vulkan-radeon
+lib32-nvidia-utils
+linux-cachyos-headers
+dkms
+nvidia-dkms
+nvidia-utils
+opencl-nvidia
+egl-wayland
+vulkan-radeon
+vulkan-nouveau
 libdvdcss
 libgsf
 libopenraw

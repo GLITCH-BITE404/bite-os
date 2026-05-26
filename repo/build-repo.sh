@@ -64,7 +64,16 @@ while read -r p; do
 done < "$HERE/foreign-packages.txt"
 
 echo "==> 4/4  Indexing the repo"
-repo-add -q "$REPO/bite-os.db.tar.gz" "$REPO/"*.pkg.tar.* 2>/dev/null
+# Keep only the newest bite-os package — older versions left in the dir make the
+# (Rust) repo-add panic on the duplicate entry.
+ls -t "$REPO"/bite-os-*.pkg.tar.* 2>/dev/null | tail -n +2 | xargs -r rm -f
+# Rebuild the db from scratch so a stale/partial db from a crashed run can't
+# crash repo-add again.
+rm -f "$REPO"/bite-os.db* "$REPO"/bite-os.files*
+repo-add "$REPO/bite-os.db.tar.gz" "$REPO/"*.pkg.tar.*
+# GitHub Releases can't serve repo-add's symlink — ship a real file named
+# bite-os.db so `pacman -Sy` can fetch the db over HTTPS.
+rm -f "$REPO/bite-os.db" && cp "$REPO/bite-os.db.tar.gz" "$REPO/bite-os.db"
 
 echo
 echo "Local repo: $REPO  ($(find "$REPO" -name '*.pkg.tar.*' ! -name '*.sig' | wc -l) packages)"
