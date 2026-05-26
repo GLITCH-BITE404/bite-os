@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = fastfetch
+Target = cachyos-fastfetch-logo
+Target = cachyos-branding
+Target = filesystem
+
+[Action]
+Description = Enforcing BITE-OS fastfetch logo (no cachy ASCII)...
+When = PostTransaction
+Exec = /usr/bin/bite-os-fix-fastfetch

@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=BITE-OS
+Description=BITE-OS boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/bite-os
+ScriptFile=/usr/share/plymouth/themes/bite-os/bite-os.script

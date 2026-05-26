@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>BITE-OS — Boot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" />
+<style>
+  :root{
+    --accent:#9b6bff;     /* BITE purple — overridden by theme */
+    --accent2:#3effe6;    /* secondary cyan */
+    --accent-dim:#3a1f78;
+    --ok:#7be38a;
+    --warn:#f5c344;
+    --err:#ff5e6b;
+    --fg:#e6e1ff;
+    --fg-dim:#6e6a8a;
+    --bg:#06040d;
+    --crt:.06;            /* scanline strength */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:#000;color:var(--fg);overflow:hidden;font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+  /* Letterbox host: centers a 1920x1080 stage and scales it to fit. */
+  #host{position:fixed;inset:0;background:#000;overflow:hidden}
+  #stage{
+    position:absolute;left:50%;top:50%;width:1920px;height:1080px;background:var(--bg);
+    transform-origin:center center;overflow:hidden;
+    box-shadow:0 0 120px rgba(0,0,0,.8);
+  }
+
+  /* CRT scanlines + faint vignette + flicker */
+  #stage::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:90;
+    background:repeating-linear-gradient(0deg,
+      rgba(255,255,255,calc(var(--crt) * .9)) 0 1px,
+      transparent 1px 3px);
+    mix-blend-mode:overlay;
+  }
+  #stage::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:91;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 50%, transparent 55%, rgba(0,0,0,.6) 100%),
+      radial-gradient(ellipse 100% 50% at 50% 0%, rgba(255,87,34,.05), transparent 50%);
+  }
+  #flicker{position:absolute;inset:0;pointer-events:none;z-index:92;background:#fff;mix-blend-mode:overlay;opacity:0;animation:flicker 4s infinite steps(2)}
+  @keyframes flicker{
+    0%,97%,100%{opacity:0}
+    97.4%{opacity:.04}
+    98%{opacity:0}
+    98.6%{opacity:.06}
+  }
+
+  /* ── PHASE 1: kernel-style boot log ───────────────────────── */
+  #log-wrap{
+    position:absolute;left:0;right:0;top:0;bottom:0;
+    padding:64px 96px;font-size:24px;line-height:1.5;
+    color:var(--fg);
+    font-feature-settings:"calt" 0;
+    letter-spacing:.01em;
+  }
+  #log-head{
+    display:flex;align-items:center;gap:18px;margin-bottom:28px;
+    color:var(--fg-dim);font-size:20px;letter-spacing:.08em;text-transform:uppercase;
+  }
+  #log-head .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  #log{display:flex;flex-direction:column;gap:6px;font-variant-numeric:tabular-nums}
+  .ln{opacity:0;transform:translateY(2px);will-change:opacity,transform}
+  .ln.in{opacity:1;transform:none;transition:opacity .04s linear, transform .12s ease-out}
+  .ln .t{color:var(--fg-dim)}        /* timestamp */
+  .ln .ok{color:var(--ok)}
+  .ln .warn{color:var(--warn)}
+  .ln .err{color:var(--err)}
+  .ln .key{color:var(--accent)}
+  .ln .dim{color:var(--fg-dim)}
+  .cursor{display:inline-block;width:.55em;height:1em;background:var(--fg);vertical-align:-2px;margin-left:.25em;animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* glitch wipe between phases */
+  #wipe{
+    position:absolute;inset:0;background:var(--accent);z-index:50;
+    transform-origin:left center;transform:scaleX(0);
+    mix-blend-mode:screen;
+  }
+
+  /* ── PHASE 2: logo lock-in ────────────────────────────────── */
+  #brand{
+    position:absolute;inset:0;display:grid;place-items:center;
+    opacity:0;z-index:60;
+  }
+  #brand .stack{display:flex;flex-direction:column;align-items:center;gap:48px}
+  #brand .row{display:flex;align-items:center;gap:36px}
+
+  /* Real BITE-OS marks. Two layers: animated teeth (chomp) + final hero logo. */
+  .mark-stack{position:relative;width:560px;height:560px;display:grid;place-items:center}
+  .mark-stack img{position:absolute;inset:0;margin:auto;width:100%;height:100%;
+    object-fit:contain;pointer-events:none;}
+  /* Teeth chomp: top/bottom halves slide in & slam */
+  #teeth-top, #teeth-bot{
+    filter:drop-shadow(0 0 24px color-mix(in oklab, var(--accent) 70%, transparent))
+           drop-shadow(0 0 80px color-mix(in oklab, var(--accent2) 40%, transparent));
+    will-change:transform,opacity;
+  }
+  #teeth-top{clip-path:inset(0 0 50% 0);transform:translateY(-180px);opacity:0}
+  #teeth-bot{clip-path:inset(50% 0 0 0);transform:translateY(180px);opacity:0}
+  #hero-logo{opacity:0;transform:scale(.92);will-change:transform,opacity;
+    filter:drop-shadow(0 0 40px color-mix(in oklab, var(--accent) 50%, transparent));}
+  /* slam flash overlay */
+  #flash{position:absolute;inset:0;background:radial-gradient(circle at center, #fff, transparent 60%);
+    opacity:0;mix-blend-mode:screen;pointer-events:none;will-change:opacity}
+
+  /* RGB-shift glitch on hero logo */
+  .glitching #hero-logo{animation:hglitch 100ms infinite steps(2)}
+  @keyframes hglitch{
+    0%{transform:scale(1) translate(-3px,0);filter:hue-rotate(0deg) drop-shadow(2px 0 0 #ff2e63) drop-shadow(-2px 0 0 #3effe6)}
+    100%{transform:scale(1) translate(3px,1px);filter:hue-rotate(20deg) drop-shadow(-2px 0 0 #ff2e63) drop-shadow(2px 0 0 #3effe6)}
+  }
+
+  .tagline{
+    font-family:"JetBrains Mono",ui-monospace,monospace;
+    font-size:28px;letter-spacing:.4em;text-transform:uppercase;
+    color:var(--fg-dim);
+  }
+  .tagline .sep{color:var(--accent);margin:0 .8em}
+
+  /* Progress bar — subtle, under the wordmark */
+  .progress{
+    width:520px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);
+    overflow:hidden;position:relative;
+  }
+  .progress > i{
+    position:absolute;left:0;top:0;bottom:0;width:0;
+    background:linear-gradient(90deg, transparent, var(--accent) 30%, var(--accent));
+    box-shadow:0 0 12px var(--accent);
+  }
+
+  /* small bottom-left badge */
+  .meta{
+    position:absolute;left:96px;bottom:64px;color:var(--fg-dim);
+    font-size:18px;letter-spacing:.18em;text-transform:uppercase;
+    display:flex;gap:18px;align-items:center;
+  }
+  .meta .pulse{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 1.6s infinite ease-in-out}
+  @keyframes pulse{0%,100%{opacity:.4;transform:scale(.85)}50%{opacity:1;transform:scale(1.1)}}
+
+  /* version stamp top-right (always on) */
+  .stamp{
+    position:absolute;right:96px;top:64px;color:var(--fg-dim);
+    font-size:18px;letter-spacing:.18em;text-transform:uppercase;
+  }
+  .stamp b{color:var(--accent);font-weight:500}
+
+  /* replay control — sits outside the scaled stage */
+  #ctrls{
+    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;gap:8px;z-index:1000;
+    font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;
+  }
+  #ctrls button{
+    appearance:none;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.6);
+    color:#cfcab9;padding:8px 14px;border-radius:8px;cursor:pointer;letter-spacing:.12em;
+    text-transform:uppercase;backdrop-filter:blur(8px);
+  }
+  #ctrls button:hover{border-color:var(--accent);color:#fff}
+
+  /* THEMES — overridden by Tweaks */
+  body.theme-bite      {--accent:#9b6bff;--accent2:#3effe6;--accent-dim:#3a1f78;--bg:#06040d;--fg:#e6e1ff;--fg-dim:#6e6a8a}
+  body.theme-terminal  {--accent:#39ff14;--accent2:#7be38a;--accent-dim:#0e4a0e;--bg:#020602;--fg:#c9ffcb;--fg-dim:#3a6f3d}
+  body.theme-catppuccin{--accent:#cba6f7;--accent2:#94e2d5;--accent-dim:#5a428a;--bg:#11111b;--fg:#cdd6f4;--fg-dim:#6c7086}
+  body.theme-tokyo     {--accent:#7aa2f7;--accent2:#7dcfff;--accent-dim:#324578;--bg:#0b0d18;--fg:#c0caf5;--fg-dim:#565f89}
+  body.theme-mono      {--accent:#ffffff;--accent2:#cccccc;--accent-dim:#666;--bg:#000;--fg:#f0f0f0;--fg-dim:#666}
+</style>
+</head>
+<body class="theme-bite">
+<link rel="icon" href="assets/teeth.png" />
+
+<div id="host">
+  <div id="stage" data-screen-label="Boot">
+    <!-- top-right version stamp -->
+    <div class="stamp">BITE-OS <b>v0.1.0</b> · KERNEL 6.8.4-bite</div>
+
+    <!-- PHASE 1: boot log -->
+    <div id="log-wrap">
+      <div id="log-head">
+        <div class="dot"></div>
+        <span>BITE Loader · Stage 2</span>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <!-- glitch wipe -->
+    <div id="wipe"></div>
+
+    <!-- PHASE 2: brand lock-in -->
+    <div id="brand">
+      <div class="stack">
+        <div class="mark-stack">
+          <img id="teeth-top" src="assets/teeth.png" alt="" />
+          <img id="teeth-bot" src="assets/teeth.png" alt="" />
+          <img id="hero-logo" src="assets/logo-hero.png" alt="BITE-OS" />
+          <div id="flash"></div>
+        </div>
+        <div class="tagline" id="tagline" style="opacity:0">FAST <span class="sep">·</span> FRIENDLY <span class="sep">·</span> PRE-RICED</div>
+        <div class="progress" id="prog"><i></i></div>
+      </div>
+    </div>
+
+    <!-- bottom-left meta -->
+    <div class="meta"><span class="pulse"></span><span id="metaText">INITIALIZING HYPRLAND</span></div>
+  </div>
+</div>
+
+<div id="ctrls">
+  <button id="replay">↻ Replay</button>
+  <button id="loopBtn">Loop: ON</button>
+</div>
+
+<!-- React + Babel for tweaks panel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   STAGE SCALING — 1920x1080 fits any viewport, letterboxed.
+   ───────────────────────────────────────────────────────────── */
+function fitStage(){
+  const stage = document.getElementById('stage');
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const k = Math.min(sw / 1920, sh / 1080);
+  stage.style.transform = `translate(-50%,-50%) scale(${k})`;
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
+/* ─────────────────────────────────────────────────────────────
+   BOOT LOG CONTENT — fake but flavorful kernel-style lines.
+   Each entry is [delay_after_prev_ms, html].
+   ───────────────────────────────────────────────────────────── */
+const LOG_LINES = [
+  [0,   `<span class="t">[ 0.000000]</span> Linux version <span class="key">6.8.4-bite</span> (<span class="dim">bite@chomp</span>) #1 SMP PREEMPT_DYNAMIC`],
+  [60,  `<span class="t">[ 0.000412]</span> Command line: BOOT_IMAGE=/vmlinuz-bite root=UUID=<span class="dim">b1te-…-c0de</span> rw quiet splash`],
+  [40,  `<span class="t">[ 0.001188]</span> CPU0: AMD Ryzen detected · <span class="ok">turbo unlocked</span>`],
+  [50,  `<span class="t">[ 0.012347]</span> Memory: <span class="key">31.4 GiB</span> available · <span class="ok">zram on</span>`],
+  [60,  `<span class="t">[ 0.022014]</span> Loading microcode…<span class="ok"> ok</span>`],
+  [40,  `<span class="t">[ 0.034210]</span> NVMe0: <span class="key">Samsung 990 PRO</span> 2TB · <span class="ok">trim ok</span>`],
+  [50,  `<span class="t">[ 0.067891]</span> drm: amdgpu init · radv vulkan driver loaded`],
+  [40,  `<span class="t">[ 0.084003]</span> input: <span class="dim">AT keyboard</span>, <span class="dim">Logitech G Pro</span>`],
+  [60,  `<span class="t">[ 0.123456]</span> systemd[1]: starting <span class="key">BITE-OS</span> · target graphical.target`],
+  [40,  `<span class="t">[ 0.198772]</span> NetworkManager: connected <span class="ok">(wlan0, 1.2 Gbps)</span>`],
+  [60,  `<span class="t">[ 0.245100]</span> pipewire: ok · wireplumber: ok`],
+  [50,  `<span class="t">[ 0.301244]</span> Loading user theme: <span class="key">bite/chomp-dark</span>`],
+  [60,  `<span class="t">[ 0.388910]</span> hyprland: starting compositor… <span class="warn">[1 monitor]</span>`],
+  [60,  `<span class="t">[ 0.422331]</span> waybar · rofi · swaync · hypridle · hyprlock <span class="ok">[ok]</span>`],
+  [60,  `<span class="t">[ 0.501009]</span> applying rice: <span class="key">~/.config/bite/chomp.toml</span>`],
+  [60,  `<span class="t">[ 0.612000]</span> wallpaper: <span class="dim">~/wallpapers/teeth.jpg</span>`],
+  [60,  `<span class="t">[ 0.699218]</span> font cache rebuilt · <span class="ok">jetbrains mono · iosevka</span>`],
+  [50,  `<span class="t">[ 0.788014]</span> session: <span class="key">bite@chomp</span> · uid 1000`],
+  [60,  `<span class="t">[ 0.880000]</span> all systems nominal — <span class="ok">welcome back.</span>`],
+];
+
+/* ─────────────────────────────────────────────────────────────
+   ANIMATION SEQUENCE
+   ───────────────────────────────────────────────────────────── */
+const log      = document.getElementById('log');
+const wipe     = document.getElementById('wipe');
+const brand    = document.getElementById('brand');
+const tagline  = document.getElementById('tagline');
+const prog     = document.getElementById('prog').firstElementChild;
+const metaTxt  = document.getElementById('metaText');
+const stage    = document.getElementById('stage');
+const teethTop = document.getElementById('teeth-top');
+const teethBot = document.getElementById('teeth-bot');
+const heroLogo = document.getElementById('hero-logo');
+const flash    = document.getElementById('flash');
+
+const state = window.__bootState = { loop: false, speed: 1, running: false, timeouts: [] };
+document.getElementById('ctrls').style.display = 'none';
+window.__setSpeed = (v) => { state.speed = v; };
+
+function later(fn, ms){
+  const id = setTimeout(fn, ms / state.speed);
+  state.timeouts.push(id);
+  return id;
+}
+function cancelAll(){ state.timeouts.forEach(clearTimeout); state.timeouts = []; }
+
+function reset(){
+  cancelAll();
+  log.innerHTML = '';
+  log.parentElement.style.opacity = 1;
+  brand.style.opacity = 0;
+  brand.style.transform = 'none';
+  wipe.style.transform = 'scaleX(0)';
+  wipe.style.transformOrigin = 'left center';
+  wipe.style.transition = 'none';
+  tagline.style.opacity = 0;
+  prog.style.width = '0%';
+  metaTxt.textContent = 'INITIALIZING HYPRLAND';
+  // teeth + hero reset
+  teethTop.style.transition = 'none';
+  teethBot.style.transition = 'none';
+  heroLogo.style.transition = 'none';
+  flash.style.transition = 'none';
+  teethTop.style.transform = 'translateY(-180px)';
+  teethTop.style.opacity = '0';
+  teethBot.style.transform = 'translateY(180px)';
+  teethBot.style.opacity = '0';
+  heroLogo.style.transform = 'scale(.92)';
+  heroLogo.style.opacity = '0';
+  flash.style.opacity = '0';
+  stage.classList.remove('glitching');
+  // force reflow so the next transition takes effect
+  void stage.offsetWidth;
+}
+
+function play(){
+  if (state.running) return;
+  state.running = true;
+  reset();
+
+  // ── Phase 1: stream boot log ────────────────────────────────
+  let acc = 200;
+  LOG_LINES.forEach(([d, html], i) => {
+    acc += d;
+    later(() => {
+      const div = document.createElement('div');
+      div.className = 'ln';
+      div.innerHTML = html;
+      // last line gets a cursor
+      if (i === LOG_LINES.length - 1) div.innerHTML += ' <span class="cursor"></span>';
+      log.appendChild(div);
+      requestAnimationFrame(()=>div.classList.add('in'));
+      // gently auto-scroll within wrap if it overflows
+      const wrap = document.getElementById('log-wrap');
+      wrap.scrollTop = wrap.scrollHeight;
+    }, acc);
+  });
+
+  const t1End = acc + 600;
+
+  // ── Phase 2: glitch wipe ────────────────────────────────────
+  later(() => {
+    wipe.style.transition = 'transform 280ms cubic-bezier(.7,0,.2,1)';
+    wipe.style.transform = 'scaleX(1)';
+    stage.classList.add('glitching');
+  }, t1End);
+
+  later(() => {
+    // hide log under wipe
+    log.parentElement.style.opacity = 0;
+    wipe.style.transformOrigin = 'right center';
+    wipe.style.transform = 'scaleX(0)';
+  }, t1End + 320);
+
+  later(() => { stage.classList.remove('glitching'); }, t1End + 700);
+
+  // ── Phase 3: brand lock-in ─────────────────────────────────
+  const brandStart = t1End + 360;
+  later(() => {
+    brand.style.transition = 'opacity 300ms ease-out';
+    brand.style.opacity = 1;
+    metaTxt.textContent = 'WELCOME BACK';
+  }, brandStart);
+
+  // teeth slide in (jaws open wide)
+  later(() => {
+    teethTop.style.transition = 'transform 520ms cubic-bezier(.2,.7,.3,1), opacity 320ms ease-out';
+    teethBot.style.transition = 'transform 520ms cubic-bezier(.2,.7,.3,1), opacity 320ms ease-out';
+    teethTop.style.transform = 'translateY(-90px)';
+    teethBot.style.transform = 'translateY(90px)';
+    teethTop.style.opacity = '1';
+    teethBot.style.opacity = '1';
+  }, brandStart + 60);
+
+  // CHOMP — slam together
+  later(() => {
+    teethTop.style.transition = 'transform 140ms cubic-bezier(.6,0,.2,1)';
+    teethBot.style.transition = 'transform 140ms cubic-bezier(.6,0,.2,1)';
+    teethTop.style.transform = 'translateY(0)';
+    teethBot.style.transform = 'translateY(0)';
+  }, brandStart + 700);
+
+  // flash on impact
+  later(() => {
+    flash.style.transition = 'opacity 80ms ease-out';
+    flash.style.opacity = '.95';
+    stage.classList.add('glitching');
+  }, brandStart + 830);
+  later(() => {
+    flash.style.transition = 'opacity 240ms ease-out';
+    flash.style.opacity = '0';
+  }, brandStart + 920);
+
+  // crossfade teeth → hero logo
+  later(() => {
+    teethTop.style.transition = 'opacity 360ms ease-out';
+    teethBot.style.transition = 'opacity 360ms ease-out';
+    teethTop.style.opacity = '0';
+    teethBot.style.opacity = '0';
+    heroLogo.style.transition = 'opacity 480ms ease-out, transform 600ms cubic-bezier(.2,1.2,.4,1)';
+    heroLogo.style.opacity = '1';
+    heroLogo.style.transform = 'scale(1)';
+  }, brandStart + 920);
+
+  later(() => { stage.classList.remove('glitching'); }, brandStart + 1280);
+
+  // tagline + progress bar
+  later(() => {
+    tagline.style.transition = 'opacity 600ms ease-out';
+    tagline.style.opacity = 1;
+  }, brandStart + 1400);
+
+  later(() => {
+    prog.style.transition = `width 1400ms cubic-bezier(.4,0,.1,1)`;
+    prog.style.width = '100%';
+  }, brandStart + 1550);
+
+  const total = brandStart + 3200;
+  later(() => {
+    state.running = false;
+    if (state.loop) play();
+  }, total);
+}
+
+/* ── Replay button + Loop toggle ─────────────────────────────── */
+document.getElementById('replay').addEventListener('click', () => {
+  state.running = false;
+  reset();
+  play();
+});
+const loopBtn = document.getElementById('loopBtn');
+loopBtn.addEventListener('click', () => {
+  state.loop = !state.loop;
+  loopBtn.textContent = `Loop: ${state.loop ? 'ON' : 'OFF'}`;
+});
+
+/* kick off */
+play();
+</script>
+
+<!-- Tweaks panel -->
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "bite",
+  "speed": 1,
+  "scanlines": 0.06,
+  "tagline": "FAST · FRIENDLY · PRE-RICED",
+  "version": "v0.1.0",
+  "showLog": true
+}/*EDITMODE-END*/;
+
+function App(){
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    document.body.className = `theme-${t.theme}`;
+    document.documentElement.style.setProperty('--crt', String(t.scanlines));
+    if (window.__bootState) window.__bootState.speed = t.speed;
+    // update tagline
+    const tagline = document.getElementById('tagline');
+    if (tagline){
+      const parts = (t.tagline || '').split('·').map(s=>s.trim()).filter(Boolean);
+      tagline.innerHTML = parts.join(' <span class="sep">·</span> ');
+    }
+    // update version stamp
+    const stamp = document.querySelector('.stamp');
+    if (stamp) stamp.innerHTML = `BITE-OS <b>${t.version}</b> · KERNEL 6.8.4-bite`;
+    // toggle log visibility (cosmetic; sequence still runs)
+    const wrap = document.getElementById('log-wrap');
+    if (wrap) wrap.style.display = t.showLog ? '' : 'none';
+  }, [t]);
+
+  // sync speed into the imperative animation state
+  React.useEffect(() => {
+    // Patched: expose state
+    if (!window.__bootSpeed) {
+      Object.defineProperty(window, '__bootSpeed', {
+        get(){ return window.__speed || 1; },
+        set(v){ window.__speed = v; }
+      });
+    }
+  }, []);
+
+  return (
+    <TweaksPanel title="Tweaks · BITE-OS Boot">
+      <TweakSection label="Theme" />
+      <TweakSelect label="Palette" value={t.theme}
+        options={[
+          {value:'bite',       label:'BITE orange'},
+          {value:'terminal',   label:'Terminal green'},
+          {value:'catppuccin', label:'Catppuccin'},
+          {value:'tokyo',      label:'Tokyo Night'},
+          {value:'mono',       label:'Mono'},
+        ]}
+        onChange={(v)=>setTweak('theme', v)} />
+      <TweakSlider label="Scanlines" value={t.scanlines} min={0} max={0.2} step={0.01}
+        onChange={(v)=>setTweak('scanlines', v)} />
+
+      <TweakSection label="Sequence" />
+      <TweakSlider label="Playback speed" value={t.speed} min={0.5} max={3} step={0.1} unit="×"
+        onChange={(v)=>{ setTweak('speed', v); window.__setSpeed && window.__setSpeed(v); }} />
+      <TweakToggle label="Show boot log" value={t.showLog}
+        onChange={(v)=>setTweak('showLog', v)} />
+
+      <TweakSection label="Copy" />
+      <TweakText label="Tagline" value={t.tagline}
+        onChange={(v)=>setTweak('tagline', v)} />
+      <TweakText label="Version" value={t.version}
+        onChange={(v)=>setTweak('version', v)} />
+    </TweaksPanel>
+  );
+}
+
+// expose a setter so the imperative animation can read tweaks
+window.__setSpeed = (v) => { /* see below */ };
+
+const root = document.createElement('div');
+document.body.appendChild(root);
+ReactDOM.createRoot(root).render(<App/>);
+</script>
+
+<!-- bridge tweaks → imperative state -->
+<script>
+window.__setSpeed = (v) => {
+  // mutate the running state object
+  const s = (window.__getBootState && window.__getBootState()) || null;
+  if (s) s.speed = v;
+};
+// expose state via getter
+(function(){
+  const orig = window;
+  // `state` is in the IIFE-less script above; re-find it through closure isn't possible,
+  // so we just read from a known property we'll set:
+})();
+</script>
+</body>
+</html>

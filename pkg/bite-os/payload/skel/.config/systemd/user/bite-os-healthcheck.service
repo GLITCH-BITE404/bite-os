@@ -1,0 +1,13 @@
+[Unit]
+Description=BITE-OS config health check & self-repair
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/glitch/bin/bite-os-healthcheck.sh
+# Never let a failed health check block the session.
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=graphical-session.target

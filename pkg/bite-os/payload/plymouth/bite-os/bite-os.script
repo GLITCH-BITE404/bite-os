@@ -1,0 +1,334 @@
+// BITE-OS Plymouth splash — full Design-System animation
+// Phase 1 : kernel-style boot log streams in (top-left)
+// Phase 2 : purple glitch wipe sweeps L→R, log clears, retracts R→L
+// Phase 3 : teeth slide in → CHOMP → flash → crossfade to hero logo
+//           → tagline fades in → progress bar fills → hero pulses
+//
+// Timing assumes Plymouth's typical ~50 Hz refresh.
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+cx = screen_w / 2;
+cy = screen_h / 2;
+
+// ── background ─────────────────────────────────────────────
+bg_image = Image("background.png");
+bg_sprite = Sprite(bg_image);
+bg_sprite.SetX(0);
+bg_sprite.SetY(0);
+bg_sprite.SetZ(-10);
+
+// ── PHASE 1: boot-log lines ────────────────────────────────
+// Each line is a pre-built sprite, hidden until its frame.
+log_x = screen_w * 0.05;
+log_y = screen_h * 0.08;
+log_lh = 30;            // line height in px
+
+// dim grey for timestamps, white for body, accent purple for keys
+fg_r = 0.90; fg_g = 0.88; fg_b = 1.00;
+
+log_lines = [
+  "[ 0.000000] Linux version 6.8.4-bite (bite@chomp) #1 SMP PREEMPT_DYNAMIC",
+  "[ 0.000412] Command line: BOOT_IMAGE=/vmlinuz-bite root=UUID=b1te-c0de rw quiet splash",
+  "[ 0.001188] CPU0: AMD Ryzen detected · turbo unlocked",
+  "[ 0.012347] Memory: 31.4 GiB available · zram on",
+  "[ 0.022014] Loading microcode... ok",
+  "[ 0.034210] NVMe0: Samsung 990 PRO 2TB · trim ok",
+  "[ 0.067891] drm: amdgpu init · radv vulkan driver loaded",
+  "[ 0.084003] input: AT keyboard, Logitech G Pro",
+  "[ 0.123456] systemd[1]: starting BITE-OS · target graphical.target",
+  "[ 0.198772] NetworkManager: connected (wlan0, 1.2 Gbps)",
+  "[ 0.245100] pipewire: ok · wireplumber: ok",
+  "[ 0.301244] Loading user theme: bite/chomp-dark",
+  "[ 0.388910] hyprland: starting compositor... [1 monitor]",
+  "[ 0.422331] waybar · rofi · swaync · hypridle · hyprlock [ok]",
+  "[ 0.501009] applying rice: ~/.config/bite/chomp.toml",
+  "[ 0.612000] wallpaper: ~/wallpapers/teeth.jpg",
+  "[ 0.699218] font cache rebuilt · jetbrains mono · iosevka",
+  "[ 0.788014] session: bite@chomp · uid 1000",
+  "[ 0.880000] all systems nominal — welcome back."
+];
+LOG_COUNT = 19;
+
+log_sprites[0] = 0;       // declare the array
+for (i = 0; i < LOG_COUNT; i++) {
+  txt = Image.Text(log_lines[i], fg_r, fg_g, fg_b);
+  s = Sprite(txt);
+  s.SetX(log_x);
+  s.SetY(log_y + i * log_lh);
+  s.SetZ(0);
+  s.SetOpacity(0);
+  log_sprites[i] = s;
+}
+
+// ── PHASE 2: glitch wipe (solid 1×1 purple, scaled to screen) ─
+wipe_img = Image("wipe.png").Scale(screen_w, screen_h);
+wipe = Sprite(wipe_img);
+wipe.SetX(0);
+wipe.SetY(0);
+wipe.SetZ(50);
+wipe.SetOpacity(0);
+
+// ── PHASE 3: teeth halves ──────────────────────────────────
+teeth_target_h_full = screen_h * 0.32;
+
+teeth_top_img = Image("teeth_top.png");
+tt_orig_w = teeth_top_img.GetWidth();
+tt_orig_h = teeth_top_img.GetHeight();
+tt_scale = (teeth_target_h_full / 2) / tt_orig_h;
+teeth_top_scaled = teeth_top_img.Scale(tt_orig_w * tt_scale, tt_orig_h * tt_scale);
+teeth_top = Sprite(teeth_top_scaled);
+tt_w = teeth_top_scaled.GetWidth();
+tt_h = teeth_top_scaled.GetHeight();
+teeth_top.SetX(cx - tt_w / 2);
+teeth_top.SetZ(1);
+
+teeth_bot_img = Image("teeth_bot.png");
+tb_orig_w = teeth_bot_img.GetWidth();
+tb_orig_h = teeth_bot_img.GetHeight();
+tb_scale = (teeth_target_h_full / 2) / tb_orig_h;
+teeth_bot_scaled = teeth_bot_img.Scale(tb_orig_w * tb_scale, tb_orig_h * tb_scale);
+teeth_bot = Sprite(teeth_bot_scaled);
+tb_w = teeth_bot_scaled.GetWidth();
+tb_h = teeth_bot_scaled.GetHeight();
+teeth_bot.SetX(cx - tb_w / 2);
+teeth_bot.SetZ(1);
+
+tt_rest_y = cy - tt_h;
+tb_rest_y = cy;
+teeth_top.SetY(tt_rest_y - 220);
+teeth_bot.SetY(tb_rest_y + 220);
+teeth_top.SetOpacity(0);
+teeth_bot.SetOpacity(0);
+
+// ── hero logo ──────────────────────────────────────────────
+logo_img = Image("logo.png");
+lg_orig_w = logo_img.GetWidth();
+lg_orig_h = logo_img.GetHeight();
+lg_target_h = screen_h * 0.38;
+lg_scale = lg_target_h / lg_orig_h;
+logo_scaled = logo_img.Scale(lg_orig_w * lg_scale, lg_orig_h * lg_scale);
+logo = Sprite(logo_scaled);
+logo.SetX(cx - logo_scaled.GetWidth() / 2);
+logo.SetY(cy - logo_scaled.GetHeight() / 2 - screen_h * 0.04);
+logo.SetZ(2);
+logo.SetOpacity(0);
+
+// ── flash overlay ──────────────────────────────────────────
+flash_img = Image("flash.png");
+flash_scaled = flash_img.Scale(screen_w, screen_h);
+flash = Sprite(flash_scaled);
+flash.SetX(0);
+flash.SetY(0);
+flash.SetZ(5);
+flash.SetOpacity(0);
+
+// ── tagline ────────────────────────────────────────────────
+tagline_img = Image.Text("FAST  ·  FRIENDLY  ·  PRE-RICED", 0.55, 0.51, 0.69);
+tagline = Sprite(tagline_img);
+tagline.SetX(cx - tagline_img.GetWidth() / 2);
+tagline.SetY(cy + screen_h * 0.18);
+tagline.SetZ(3);
+tagline.SetOpacity(0);
+
+// ── progress bar (track + fill) ────────────────────────────
+bar_w = 520;
+bar_h = 4;
+bar_x = cx - bar_w / 2;
+bar_y = cy + screen_h * 0.24;
+
+bar_bg_img = Image("bar_bg.png").Scale(bar_w, bar_h);
+bar_bg = Sprite(bar_bg_img);
+bar_bg.SetX(bar_x);
+bar_bg.SetY(bar_y);
+bar_bg.SetZ(3);
+bar_bg.SetOpacity(0);
+
+// the fill sprite is rebuilt each frame at the current width
+bar_fill_src = Image("bar_fill.png");
+bar_fill = Sprite(bar_fill_src.Scale(1, bar_h));
+bar_fill.SetX(bar_x);
+bar_fill.SetY(bar_y);
+bar_fill.SetZ(4);
+bar_fill.SetOpacity(0);
+bar_fill_last_w = -1;
+
+// ── timeline frames @ ~50 fps ──────────────────────────────
+F_INTRO       = 10;                              // 0.20 s settle
+LOG_STEP      = 3;                               // 60 ms per line
+F_LOG_END     = F_INTRO + LOG_COUNT * LOG_STEP;  // 67  (1.34 s)
+F_LOG_HOLD    = 16;                              // 0.32 s
+F_PHASE1_END  = F_LOG_END + F_LOG_HOLD;          // 83
+
+F_WIPE_IN     = 14;                              // 0.28 s sweep in
+F_WIPE_HOLD   = 4;                               // 0.08 s
+F_WIPE_OUT    = 14;                              // 0.28 s retract
+F_PHASE2_END  = F_PHASE1_END + F_WIPE_IN + F_WIPE_HOLD + F_WIPE_OUT;  // 115
+
+// brand_start = F_PHASE2_END
+F_SLIDE_END   = F_PHASE2_END + 26;   // teeth slide in (520ms)
+F_CHOMP_END   = F_SLIDE_END + 7;     // chomp slam (140ms)
+F_FLASH_END   = F_CHOMP_END + 12;    // flash peak+fade (240ms)
+F_FADE_END    = F_FLASH_END + 18;    // crossfade teeth→hero (360ms)
+F_TAGLINE_END = F_FADE_END + 30;     // tagline fade-in (600ms)
+F_PROG_END    = F_TAGLINE_END + 70;  // bar fill (1400ms)
+
+frame = 0;
+
+fun lerp(a, b, t) { return a + (b - a) * t; }
+fun clamp01(t) { if (t < 0) return 0; if (t > 1) return 1; return t; }
+
+fun refresh_callback() {
+  frame++;
+
+  // ── PHASE 1: stream the boot log ─────────────────────────
+  if (frame <= F_PHASE1_END) {
+    if (frame >= F_INTRO) {
+      idx = (frame - F_INTRO) / LOG_STEP;
+      if (idx >= LOG_COUNT) idx = LOG_COUNT - 1;
+      for (i = 0; i <= idx; i++) {
+        log_sprites[i].SetOpacity(1);
+      }
+    }
+    return;
+  }
+
+  // ── PHASE 2: glitch wipe ─────────────────────────────────
+  // wipe expands L→R
+  if (frame <= F_PHASE1_END + F_WIPE_IN) {
+    t = clamp01((frame - F_PHASE1_END) / F_WIPE_IN);
+    e = 1 - (1 - t) * (1 - t);
+    w = screen_w * e;
+    wipe.SetOpacity(0.85);
+    // anchor at left, scale wipe to current width
+    wipe_img2 = Image("wipe.png").Scale(w + 1, screen_h);
+    wipe.SetImage(wipe_img2);
+    wipe.SetX(0);
+    return;
+  }
+  // brief hold + clear log
+  if (frame <= F_PHASE1_END + F_WIPE_IN + F_WIPE_HOLD) {
+    for (i = 0; i < LOG_COUNT; i++) { log_sprites[i].SetOpacity(0); }
+    return;
+  }
+  // wipe retracts L→R off-screen (anchor moves right)
+  if (frame <= F_PHASE2_END) {
+    t = clamp01((frame - F_PHASE1_END - F_WIPE_IN - F_WIPE_HOLD) / F_WIPE_OUT);
+    e = t * t;
+    w = screen_w * (1 - e);
+    wipe_img2 = Image("wipe.png").Scale(w + 1, screen_h);
+    wipe.SetImage(wipe_img2);
+    wipe.SetX(screen_w - w);
+    if (frame == F_PHASE2_END) wipe.SetOpacity(0);
+    return;
+  }
+
+  // ── PHASE 3a: teeth slide in (jaws open wide) ────────────
+  if (frame <= F_SLIDE_END) {
+    t = clamp01((frame - F_PHASE2_END) / (F_SLIDE_END - F_PHASE2_END));
+    e = 1 - (1 - t) * (1 - t);
+    teeth_top.SetY(lerp(tt_rest_y - 220, tt_rest_y - 90, e));
+    teeth_bot.SetY(lerp(tb_rest_y + 220, tb_rest_y + 90, e));
+    teeth_top.SetOpacity(e);
+    teeth_bot.SetOpacity(e);
+    return;
+  }
+
+  // ── PHASE 3b: CHOMP slam ─────────────────────────────────
+  if (frame <= F_CHOMP_END) {
+    t = clamp01((frame - F_SLIDE_END) / (F_CHOMP_END - F_SLIDE_END));
+    e = t * t * t;
+    teeth_top.SetY(lerp(tt_rest_y - 90, tt_rest_y, e));
+    teeth_bot.SetY(lerp(tb_rest_y + 90, tb_rest_y, e));
+    teeth_top.SetOpacity(1);
+    teeth_bot.SetOpacity(1);
+    return;
+  }
+
+  // ── PHASE 3c: flash on impact ────────────────────────────
+  if (frame <= F_FLASH_END) {
+    t = clamp01((frame - F_CHOMP_END) / (F_FLASH_END - F_CHOMP_END));
+    if (t < 0.4) {
+      flash.SetOpacity(t / 0.4 * 0.95);
+    } else {
+      flash.SetOpacity((1 - (t - 0.4) / 0.6) * 0.95);
+    }
+    teeth_top.SetY(tt_rest_y);
+    teeth_bot.SetY(tb_rest_y);
+    return;
+  }
+
+  // ── PHASE 3d: crossfade teeth → hero ─────────────────────
+  if (frame <= F_FADE_END) {
+    t = clamp01((frame - F_FLASH_END) / (F_FADE_END - F_FLASH_END));
+    flash.SetOpacity(0);
+    teeth_top.SetOpacity(1 - t);
+    teeth_bot.SetOpacity(1 - t);
+    logo.SetOpacity(t);
+    return;
+  }
+
+  // ── PHASE 3e: tagline fade in ────────────────────────────
+  if (frame <= F_TAGLINE_END) {
+    teeth_top.SetOpacity(0);
+    teeth_bot.SetOpacity(0);
+    t = clamp01((frame - F_FADE_END) / (F_TAGLINE_END - F_FADE_END));
+    tagline.SetOpacity(t);
+    bar_bg.SetOpacity(t * 0.9);
+    logo.SetOpacity(1);
+    return;
+  }
+
+  // ── PHASE 3f: progress bar fills ─────────────────────────
+  if (frame <= F_PROG_END) {
+    t = clamp01((frame - F_TAGLINE_END) / (F_PROG_END - F_TAGLINE_END));
+    e = 1 - (1 - t) * (1 - t) * (1 - t);
+    new_w = bar_w * e;
+    if (new_w < 1) new_w = 1;
+    iw = new_w;
+    if (iw != bar_fill_last_w) {
+      bar_fill.SetImage(bar_fill_src.Scale(iw, bar_h));
+      bar_fill_last_w = iw;
+    }
+    bar_fill.SetOpacity(1);
+    tagline.SetOpacity(1);
+    bar_bg.SetOpacity(0.9);
+    return;
+  }
+
+  // ── PHASE 3g: hero pulse ─────────────────────────────────
+  flash.SetOpacity(0);
+  phase = ((frame - F_PROG_END) % 120) / 120;
+  pulse = 0.89 + 0.11 * Math.Cos(phase * 6.28318);
+  logo.SetOpacity(pulse);
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+// suppress kernel/journal text — our log is fake-on-purpose
+fun message_callback(text) { }
+Plymouth.SetMessageFunction(message_callback);
+
+fun update_status_callback(status) { }
+Plymouth.SetUpdateStatusFunction(update_status_callback);
+
+fun display_password_callback(prompt, bullets) {
+  prompt_image = Image.Text(prompt + "  " + bullets, 1, 1, 1);
+  prompt_sprite = Sprite(prompt_image);
+  prompt_sprite.SetX((screen_w - prompt_image.GetWidth()) / 2);
+  prompt_sprite.SetY(screen_h * 0.78);
+  prompt_sprite.SetZ(6);
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+fun quit_callback() {
+  logo.SetOpacity(0);
+  teeth_top.SetOpacity(0);
+  teeth_bot.SetOpacity(0);
+  flash.SetOpacity(0);
+  wipe.SetOpacity(0);
+  tagline.SetOpacity(0);
+  bar_bg.SetOpacity(0);
+  bar_fill.SetOpacity(0);
+  for (i = 0; i < LOG_COUNT; i++) { log_sprites[i].SetOpacity(0); }
+}
+Plymouth.SetQuitFunction(quit_callback);

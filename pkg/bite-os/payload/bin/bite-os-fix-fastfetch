@@ -1,0 +1,105 @@
+#!/bin/bash
+# bite-os-fix-fastfetch — guarantee fastfetch never shows a CachyOS / cachy
+# ASCII logo. Forces every fastfetch config under management to use the
+# BITE-OS sixel logo, strips any "cachy"/"cachyos" logo source it finds,
+# and writes a system-wide /etc/fastfetch/config.jsonc as a safety net.
+#
+# Idempotent. Designed to run from a pacman PostTransaction hook on
+# fastfetch / cachyos-* / filesystem updates.
+set -euo pipefail
+
+LOGO_PATH="/usr/share/bite-os/logo.png"
+USER_LOGO_FALLBACK_GLOB="/home/*/.config/glitch/logos/biteos_icon.png"
+
+# 1. Pick a sixel-able logo file. Prefer the system-installed one; fall back
+#    to whatever the primary user has under ~/.config/glitch/logos/.
+pick_logo() {
+    if [[ -f "$LOGO_PATH" ]]; then echo "$LOGO_PATH"; return; fi
+    for p in $USER_LOGO_FALLBACK_GLOB; do
+        [[ -f "$p" ]] && { echo "$p"; return; }
+    done
+    echo ""
+}
+LOGO="$(pick_logo)"
+
+# 2. Build the canonical config block. If we have an image logo, use sixel;
+#    otherwise force a small "BITE-OS" text block so cachy ASCII never wins.
+write_canonical() {
+    local out="$1"
+    mkdir -p "$(dirname "$out")"
+    if [[ -n "$LOGO" ]]; then
+        cat > "$out" <<EOF
+{
+    "\$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "sixel",
+        "source": "${LOGO}",
+        "width": 35,
+        "height": 18,
+        "padding": { "top": 1, "left": 2, "right": 3 }
+    },
+    "display": { "separator": "  " },
+    "modules": [
+        "break",
+        { "type": "custom", "format": "╭────────────────────────────────────╮" },
+        { "type": "command",  "key": "│  kernel", "keyWidth": 13, "text": "uname -r | sed 's/-cachyos//'", "format": "{}[78G│" },
+        { "type": "uptime",   "key": "│  uptime", "keyWidth": 13, "format": "{2}[78G│" },
+        { "type": "shell",    "key": "│  shell",  "keyWidth": 13, "format": "{3}[78G│" },
+        { "type": "memory",   "key": "│  mem",    "keyWidth": 13, "format": "{1} / {2} {3}[78G│" },
+        { "type": "packages", "key": "│  pkgs",   "keyWidth": 13, "format": "{all}[78G│" },
+        { "type": "custom",   "format": "╰────────────────────────────────────╯" },
+        "break"
+    ]
+}
+EOF
+    else
+        cat > "$out" <<'EOF'
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "raw",
+        "source": "[1;35m  ▄▄▄▄ ▄ ▄▄▄▄▄ ▄▄▄▄▄ ▄▄▄▄▄▄ ▄▄▄▄ \n  █  █ █   █   █     █    █ █  █\n  █▀▀  █   █   █▀▀▀  █  █▄█ █▀▀ \n  █▄▄█ █   █   █▄▄▄▄ █▄▄▄▄▄ █▄▄▄\n[0m"
+    },
+    "display": { "separator": "  " },
+    "modules": [ "title", "os", "host", "kernel", "uptime", "packages", "shell", "memory" ]
+}
+EOF
+    fi
+}
+
+# 3. System-wide safety net: anyone running `fastfetch` without a personal
+#    config still gets BITE-OS branding instead of cachy ASCII.
+write_canonical /etc/fastfetch/config.jsonc
+
+# 4. Per-user enforcement. For every real user's fastfetch config:
+#    - If file references "cachyos" or "cachy" ASCII as the logo, rewrite.
+#    - Otherwise, leave it alone (user may have their own customizations).
+strip_cachy_user_config() {
+    local cfg="$1"
+    [[ -f "$cfg" ]] || return 0
+    if grep -qiE '"(source|type)"[[:space:]]*:[[:space:]]*"(cachy|cachyos)"' "$cfg" \
+       || grep -qiE 'cachyos\.txt|cachy\.txt|cachyos_logo|cachyos.ascii' "$cfg"; then
+        local owner
+        owner="$(stat -c '%U:%G' "$cfg")"
+        cp -a "$cfg" "${cfg}.bak-cachy-$(date +%s)" || true
+        write_canonical "$cfg"
+        chown "$owner" "$cfg" 2>/dev/null || true
+        echo "[bite-os-fix-fastfetch] rewrote: $cfg (had cachy logo refs)"
+    fi
+}
+
+shopt -s nullglob
+for home in /home/*; do
+    [[ -d "$home" ]] || continue
+    strip_cachy_user_config "$home/.config/fastfetch/config.jsonc"
+done
+strip_cachy_user_config /root/.config/fastfetch/config.jsonc
+
+# 5. Belt-and-suspenders: nuke any cachyos ascii logo files lying around
+#    where fastfetch might pick them up. Only files we recognize by name.
+for f in /usr/share/cachyos/cachyos.ascii /usr/share/cachyos/logo.txt \
+         /usr/share/fastfetch/logos/cachyos.txt; do
+    [[ -e "$f" ]] && rm -f "$f" && echo "[bite-os-fix-fastfetch] removed: $f"
+done
+
+echo "[bite-os-fix-fastfetch] done"

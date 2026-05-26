@@ -215,9 +215,11 @@ sudo pacman -S --needed archiso
 sudo bash build-iso.sh         # build the ISO -> out/
 ```
 
-> **Note:** the `bite-os` package payload (the rices, themes and tooling) is
-> staged from a running BITE-OS system and is not committed here to keep the
-> repo lean. The shipped ISO above is the ready-to-use build.
+This builds **BITE-OS itself** (not a "make your own distro" template) — the rices,
+themes and tooling are all committed, so a **fresh clone builds the full ISO**. You'll
+need an Arch / CachyOS host with `paru` (it fetches the AUR dependencies during
+`build-repo.sh`). Most people should just grab the [ISO](#-download) above — building is
+for tinkerers who want to rebuild or fork it.
 
 ## ◈ License & Credit
 

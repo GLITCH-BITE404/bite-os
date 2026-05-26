@@ -1,0 +1,14 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = cachyos-release
+Target = lsb-release
+Target = os-prober
+Target = fastfetch
+
+[Action]
+Description = Restoring BITE-OS branding...
+When = PostTransaction
+Exec = /usr/bin/bite-os-rebrand

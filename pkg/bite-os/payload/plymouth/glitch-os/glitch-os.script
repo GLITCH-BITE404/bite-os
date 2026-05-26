@@ -1,0 +1,406 @@
+// BITE-OS animated boot splash
+// Phase 0: intrusion / fake decrypt log (frames 0-70)
+// Phase 1-5: fangs converge, chomp, hold, retract (frames 70-290)
+// Phase 6: OS reveal — "BITE-OS // CHEW THROUGH" tagline (frames 290-340)
+// ~9.7s loop at 35fps. Heavy chromatic aberration + scanline tears throughout.
+
+Window.SetBackgroundTopColor(0.01, 0.01, 0.02);
+Window.SetBackgroundBottomColor(0.02, 0.01, 0.04);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+screen_x = Window.GetX();
+screen_y = Window.GetY();
+cx = screen_x + screen_w / 2;
+cy = screen_y + screen_h / 2;
+
+// ---------- TEXT "BITE-OS" ----------
+text_raw = Image.Text("BITE-OS", 0.78, 0.5, 1.0, 1.0);
+text_img = text_raw.Scale(text_raw.GetWidth() * 6, text_raw.GetHeight() * 6);
+text_sprite = Sprite(text_img);
+text_w = text_img.GetWidth();
+text_h = text_img.GetHeight();
+text_x = cx - text_w / 2;
+text_y = cy - text_h / 2;
+text_sprite.SetPosition(text_x, text_y, 0);
+text_sprite.SetOpacity(0);
+
+// chromatic-aberration ghosts (cyan + magenta + green)
+ghost_c_raw = Image.Text("BITE-OS", 0.2, 1.0, 0.95, 1.0);
+ghost_cyan  = Sprite(ghost_c_raw.Scale(text_w, text_h));
+ghost_cyan.SetPosition(text_x, text_y, -1);
+ghost_cyan.SetOpacity(0);
+
+ghost_m_raw = Image.Text("BITE-OS", 1.0, 0.24, 0.94, 1.0);
+ghost_magenta = Sprite(ghost_m_raw.Scale(text_w, text_h));
+ghost_magenta.SetPosition(text_x, text_y, -2);
+ghost_magenta.SetOpacity(0);
+
+ghost_g_raw = Image.Text("BITE-OS", 0.35, 1.0, 0.55, 1.0);
+ghost_green = Sprite(ghost_g_raw.Scale(text_w, text_h));
+ghost_green.SetPosition(text_x, text_y, -3);
+ghost_green.SetOpacity(0);
+
+// ---------- FANGS (top + bottom) ----------
+top_img = Image("fangs_top.png");
+top_target_w = text_w * 1.30;
+top_scaled = top_img.Scale(top_target_w, top_img.GetHeight() * (top_target_w / top_img.GetWidth()));
+top_sprite = Sprite(top_scaled);
+top_w = top_scaled.GetWidth();
+top_h = top_scaled.GetHeight();
+top_x_base = cx - top_w / 2;
+top_start_y = screen_y - top_h - 20;
+top_target_y = text_y - top_h * 0.55;
+top_sprite.SetPosition(top_x_base, top_start_y, 2);
+top_sprite.SetOpacity(0);
+
+bot_img = Image("fangs_bottom.png");
+bot_target_w = text_w * 1.30;
+bot_scaled = bot_img.Scale(bot_target_w, bot_img.GetHeight() * (bot_target_w / bot_img.GetWidth()));
+bot_sprite = Sprite(bot_scaled);
+bot_w = bot_scaled.GetWidth();
+bot_h = bot_scaled.GetHeight();
+bot_x_base = cx - bot_w / 2;
+bot_start_y = screen_y + screen_h + 20;
+bot_target_y = text_y + text_h - bot_h * 0.45;
+bot_sprite.SetPosition(bot_x_base, bot_start_y, 2);
+bot_sprite.SetOpacity(0);
+
+// ---------- SCANLINE TEAR ----------
+tear_h = Math.Int(text_h * 0.18);
+if (tear_h < 6) tear_h = 6;
+tear_img = Image.Text("                ", 1.0, 1.0, 1.0, 0.10).Scale(screen_w, tear_h);
+tear_sprite = Sprite(tear_img);
+tear_sprite.SetPosition(screen_x, cy, 5);
+tear_sprite.SetOpacity(0);
+
+// ---------- INTRUSION LOG LINES (Phase 0) ----------
+// Mono-ish green text, bottom-left, revealed sequentially
+intro_scale = 2.2;
+intro_x = screen_x + Math.Int(screen_w * 0.08);
+intro_y0 = screen_y + Math.Int(screen_h * 0.62);
+
+fun mkline(s, r, g, b) {
+    img = Image.Text(s, r, g, b, 1.0);
+    return img.Scale(img.GetWidth() * intro_scale, img.GetHeight() * intro_scale);
+}
+
+l1 = mkline("> probing  /dev/sda  ........  OK",     0.35, 1.0, 0.55);
+l2 = mkline("> mounting cryptroot  .......  OK",     0.35, 1.0, 0.55);
+l3 = mkline("> bypassing ICE  ............  OK",     1.0,  0.5, 0.3);
+l4 = mkline("> decrypting vault  [########]  100%",  0.35, 1.0, 0.55);
+l5 = mkline("> handshake  // dedsec/0xB1TE  OK",     0.2,  1.0, 0.95);
+l6 = mkline("> initializing  BITE-OS  ...",          1.0,  1.0, 1.0);
+
+ls1 = Sprite(l1); ls1.SetOpacity(0);
+ls2 = Sprite(l2); ls2.SetOpacity(0);
+ls3 = Sprite(l3); ls3.SetOpacity(0);
+ls4 = Sprite(l4); ls4.SetOpacity(0);
+ls5 = Sprite(l5); ls5.SetOpacity(0);
+ls6 = Sprite(l6); ls6.SetOpacity(0);
+
+line_h = l1.GetHeight() + 6;
+ls1.SetPosition(intro_x, intro_y0,             3);
+ls2.SetPosition(intro_x, intro_y0 + line_h,    3);
+ls3.SetPosition(intro_x, intro_y0 + line_h*2,  3);
+ls4.SetPosition(intro_x, intro_y0 + line_h*3,  3);
+ls5.SetPosition(intro_x, intro_y0 + line_h*4,  3);
+ls6.SetPosition(intro_x, intro_y0 + line_h*5,  3);
+
+// white flash plate for the transition into the bite
+flash_img = Image.Text("                                    ", 1.0, 1.0, 1.0, 0.85).Scale(screen_w, screen_h);
+flash_sprite = Sprite(flash_img);
+flash_sprite.SetPosition(screen_x, screen_y, 9);
+flash_sprite.SetOpacity(0);
+
+// ---------- TAGLINE (Phase 6 reveal) ----------
+sub_raw = Image.Text("v0.1  //  CHEW THROUGH", 0.78, 0.5, 1.0, 1.0);
+sub_img = sub_raw.Scale(sub_raw.GetWidth() * 2.6, sub_raw.GetHeight() * 2.6);
+sub_sprite = Sprite(sub_img);
+sub_w = sub_img.GetWidth();
+sub_h = sub_img.GetHeight();
+sub_x = cx - sub_w / 2;
+sub_y = text_y + text_h + Math.Int(text_h * 0.25);
+sub_sprite.SetPosition(sub_x, sub_y, 0);
+sub_sprite.SetOpacity(0);
+
+sub_g_raw = Image.Text("v0.1  //  CHEW THROUGH", 0.2, 1.0, 0.95, 1.0);
+sub_ghost = Sprite(sub_g_raw.Scale(sub_w, sub_h));
+sub_ghost.SetPosition(sub_x, sub_y, -1);
+sub_ghost.SetOpacity(0);
+
+frame = 0;
+INTRO_END = 70;
+LOOP_END = 340;
+
+fun hide_intro() {
+    ls1.SetOpacity(0); ls2.SetOpacity(0); ls3.SetOpacity(0);
+    ls4.SetOpacity(0); ls5.SetOpacity(0); ls6.SetOpacity(0);
+}
+
+fun refresh() {
+    frame = frame + 1;
+    if (frame > LOOP_END) {
+        frame = 0;
+        top_sprite.SetPosition(top_x_base, top_start_y, 2);
+        bot_sprite.SetPosition(bot_x_base, bot_start_y, 2);
+        top_sprite.SetOpacity(0);
+        bot_sprite.SetOpacity(0);
+        text_sprite.SetOpacity(0);
+        ghost_cyan.SetOpacity(0);
+        ghost_magenta.SetOpacity(0);
+        ghost_green.SetOpacity(0);
+        tear_sprite.SetOpacity(0);
+        sub_sprite.SetOpacity(0);
+        sub_ghost.SetOpacity(0);
+        flash_sprite.SetOpacity(0);
+        hide_intro();
+    }
+
+    // ============================================================
+    // PHASE 0: INTRUSION LOG (0-70)
+    // Lines pop in one by one with flicker, then a white flash.
+    // ============================================================
+    if (frame < 65) {
+        // reveal cadence — each line locks in at its frame, but flickers before
+        if (frame >= 2)  ls1.SetOpacity(0.85 + Math.Random() * 0.15);
+        if (frame >= 10) ls2.SetOpacity(0.85 + Math.Random() * 0.15);
+        if (frame >= 18) ls3.SetOpacity(0.80 + Math.Random() * 0.20);
+        if (frame >= 28) ls4.SetOpacity(0.85 + Math.Random() * 0.15);
+        if (frame >= 38) ls5.SetOpacity(0.80 + Math.Random() * 0.20);
+        if (frame >= 48) {
+            // last line pulses harder — it's the "go" signal
+            ls6.SetOpacity(0.55 + Math.Random() * 0.45);
+        }
+        // occasional global flicker on the log block
+        if (Math.Random() < 0.06) {
+            ls3.SetOpacity(0.2);
+            ls5.SetOpacity(0.2);
+        }
+        // micro-tears across the log too
+        if (Math.Random() < 0.15) {
+            ty = intro_y0 + Math.Random() * (line_h * 6);
+            tear_sprite.SetPosition(screen_x, ty, 5);
+            tear_sprite.SetOpacity(0.4 + Math.Random() * 0.4);
+        }
+        if (Math.Random() >= 0.15) tear_sprite.SetOpacity(0);
+    }
+    // white flash transition (65-70)
+    if (frame >= 65)
+    if (frame < 70) {
+        t = (frame - 65) / 5;
+        // bright, fast falloff
+        flash_sprite.SetOpacity(0.95 - t * 0.85);
+        hide_intro();
+        tear_sprite.SetOpacity(0);
+    }
+    if (frame == 70) {
+        flash_sprite.SetOpacity(0);
+    }
+
+    // ============================================================
+    // PHASE 1: word fades in with violent aberration (70-95)
+    // ============================================================
+    if (frame >= 70)
+    if (frame < 95) {
+        a = (frame - 70) / 25;
+        text_sprite.SetOpacity(a);
+        ghost_cyan.SetOpacity(a * 0.7);
+        ghost_magenta.SetOpacity(a * 0.7);
+        ghost_green.SetOpacity(a * 0.35);
+        gx = (Math.Random() - 0.5) * 14;
+        gy = (Math.Random() - 0.5) * 4;
+        ghost_cyan.SetPosition(text_x + gx, text_y + gy, -1);
+        ghost_magenta.SetPosition(text_x - gx, text_y - gy, -2);
+        ghost_green.SetPosition(text_x + gx * 0.4, text_y - gy * 0.4, -3);
+
+        if (Math.Random() < 0.18) {
+            tear_y = text_y + Math.Random() * text_h;
+            tear_sprite.SetPosition(screen_x, tear_y, 5);
+            tear_sprite.SetOpacity(0.6 + Math.Random() * 0.4);
+        }
+        if (Math.Random() >= 0.18) tear_sprite.SetOpacity(0);
+    }
+
+    // ============================================================
+    // PHASE 2: fangs descend / rise toward word (95-175)
+    // ============================================================
+    if (frame >= 95)
+    if (frame < 175) {
+        t = (frame - 95) / 80;
+        eased = t * (2 - t);
+
+        ty = top_start_y + (top_target_y - top_start_y) * eased;
+        by = bot_start_y + (bot_target_y - bot_start_y) * eased;
+        shake = 48 * (1 - t) + 18 * t;
+        jx1 = (Math.Random() - 0.5) * shake;
+        jx2 = (Math.Random() - 0.5) * shake;
+        jy1 = (Math.Random() - 0.5) * 6;
+        jy2 = (Math.Random() - 0.5) * 6;
+
+        top_sprite.SetPosition(top_x_base + jx1, ty + jy1, 2);
+        bot_sprite.SetPosition(bot_x_base + jx2, by + jy2, 2);
+        top_sprite.SetOpacity(eased);
+        bot_sprite.SetOpacity(eased);
+
+        gx = (Math.Random() - 0.5) * 8;
+        gy = (Math.Random() - 0.5) * 3;
+        ghost_cyan.SetPosition(text_x + gx, text_y + gy, -1);
+        ghost_magenta.SetPosition(text_x - gx, text_y - gy, -2);
+        ghost_green.SetPosition(text_x + gx * 0.5, text_y - gy * 0.5, -3);
+        ghost_green.SetOpacity(0.25 + Math.Random() * 0.3);
+        text_sprite.SetOpacity(1);
+
+        if (Math.Random() < 0.22) {
+            tear_y = text_y + Math.Random() * text_h;
+            tear_sprite.SetPosition(screen_x, tear_y, 5);
+            tear_sprite.SetOpacity(0.5 + Math.Random() * 0.5);
+        }
+        if (Math.Random() >= 0.22) tear_sprite.SetOpacity(0);
+    }
+
+    // ============================================================
+    // PHASE 3: clamp / impact (175-195)
+    // ============================================================
+    if (frame >= 175)
+    if (frame < 195) {
+        t = (frame - 175) / 20;
+        push = t * 0.07;
+        ty = top_target_y + text_h * push;
+        by = bot_target_y - text_h * push;
+        sx = (Math.Random() - 0.5) * 12 * (1 - t);
+        sy = (Math.Random() - 0.5) * 6 * (1 - t);
+        top_sprite.SetPosition(top_x_base + sx, ty + sy, 2);
+        bot_sprite.SetPosition(bot_x_base - sx, by - sy, 2);
+        top_sprite.SetOpacity(1);
+        bot_sprite.SetOpacity(1);
+
+        gx = (Math.Random() - 0.5) * 28;
+        gy = (Math.Random() - 0.5) * 12;
+        ghost_cyan.SetPosition(text_x + gx, text_y + gy, -1);
+        ghost_magenta.SetPosition(text_x - gx, text_y - gy, -2);
+        ghost_green.SetPosition(text_x + gx * 0.6, text_y - gy * 0.6, -3);
+        ghost_cyan.SetOpacity(0.7 + Math.Random() * 0.3);
+        ghost_magenta.SetOpacity(0.7 + Math.Random() * 0.3);
+        ghost_green.SetOpacity(0.4 + Math.Random() * 0.4);
+        text_sprite.SetOpacity(0.45 + Math.Random() * 0.55);
+
+        tear_y = text_y + Math.Random() * text_h;
+        tear_sprite.SetPosition(screen_x, tear_y, 5);
+        tear_sprite.SetOpacity(0.7 + Math.Random() * 0.3);
+    }
+
+    // ============================================================
+    // PHASE 4: held bite + heavy glitch (195-270)
+    // ============================================================
+    if (frame >= 195)
+    if (frame < 270) {
+        tj = (Math.Random() - 0.5) * 7;
+        bj = (Math.Random() - 0.5) * 7;
+        top_sprite.SetPosition(top_x_base + tj, top_target_y + text_h * 0.07 + (Math.Random() - 0.5) * 4, 2);
+        bot_sprite.SetPosition(bot_x_base + bj, bot_target_y - text_h * 0.07 + (Math.Random() - 0.5) * 4, 2);
+        top_sprite.SetOpacity(1);
+        bot_sprite.SetOpacity(1);
+
+        gx = (Math.Random() - 0.5) * 14;
+        gy = (Math.Random() - 0.5) * 5;
+        ghost_cyan.SetPosition(text_x + gx, text_y + gy, -1);
+        ghost_magenta.SetPosition(text_x - gx, text_y - gy, -2);
+        ghost_green.SetPosition(text_x + gx * 0.5, text_y - gy * 0.5, -3);
+        ghost_cyan.SetOpacity(0.45 + Math.Random() * 0.5);
+        ghost_magenta.SetOpacity(0.45 + Math.Random() * 0.5);
+        ghost_green.SetOpacity(0.25 + Math.Random() * 0.4);
+
+        if (Math.Random() < 0.12) {
+            text_sprite.SetOpacity(0.15 + Math.Random() * 0.7);
+        }
+        if (Math.Random() >= 0.12) {
+            text_sprite.SetOpacity(1);
+        }
+
+        if (Math.Random() < 0.30) {
+            tear_y = text_y + Math.Random() * text_h;
+            tear_sprite.SetPosition(screen_x, tear_y, 5);
+            tear_sprite.SetOpacity(0.55 + Math.Random() * 0.45);
+        }
+        if (Math.Random() >= 0.30) tear_sprite.SetOpacity(0);
+    }
+
+    // ============================================================
+    // PHASE 5: retract fangs (270-290)
+    // ============================================================
+    if (frame >= 270)
+    if (frame < 290) {
+        t = (frame - 270) / 20;
+        ty = top_target_y + (top_start_y - top_target_y) * t;
+        by = bot_target_y + (bot_start_y - bot_target_y) * t;
+        top_sprite.SetPosition(top_x_base, ty, 2);
+        bot_sprite.SetPosition(bot_x_base, by, 2);
+        top_sprite.SetOpacity(1 - t);
+        bot_sprite.SetOpacity(1 - t);
+        text_sprite.SetOpacity(1);
+        ghost_cyan.SetOpacity((1 - t) * 0.6);
+        ghost_magenta.SetOpacity((1 - t) * 0.6);
+        ghost_green.SetOpacity((1 - t) * 0.3);
+        tear_sprite.SetOpacity(0);
+    }
+
+    // ============================================================
+    // PHASE 6: OS REVEAL — tagline materializes (290-340)
+    // BITE-OS holds steady, subtitle types/glitches in below
+    // ============================================================
+    if (frame >= 290)
+    if (frame < 340) {
+        t = (frame - 290) / 50;
+        // BITE-OS settles to clean readable state
+        text_sprite.SetOpacity(1);
+        // very light residual aberration
+        gx = (Math.Random() - 0.5) * 4;
+        gy = (Math.Random() - 0.5) * 1.5;
+        ghost_cyan.SetPosition(text_x + gx, text_y + gy, -1);
+        ghost_magenta.SetPosition(text_x - gx, text_y - gy, -2);
+        ghost_cyan.SetOpacity(0.25);
+        ghost_magenta.SetOpacity(0.25);
+        ghost_green.SetOpacity(0);
+
+        // subtitle fades in with its own ghost
+        sub_a = t;
+        if (sub_a > 1) sub_a = 1;
+        sub_sprite.SetOpacity(sub_a);
+        sgx = (Math.Random() - 0.5) * 6;
+        sgy = (Math.Random() - 0.5) * 2;
+        sub_ghost.SetPosition(sub_x + sgx, sub_y + sgy, -1);
+        sub_ghost.SetOpacity(sub_a * 0.6);
+
+        // occasional tagline glitch — drop subtitle to 0 for 1 frame
+        if (Math.Random() < 0.08) {
+            sub_sprite.SetOpacity(0.1);
+        }
+
+        // sparse tears on the subtitle line
+        if (Math.Random() < 0.10) {
+            tear_sprite.SetPosition(screen_x, sub_y + Math.Random() * sub_h, 5);
+            tear_sprite.SetOpacity(0.3 + Math.Random() * 0.4);
+        }
+        if (Math.Random() >= 0.10) tear_sprite.SetOpacity(0);
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh);
+
+fun boot_progress(time, percent) { }
+Plymouth.SetBootProgressFunction(boot_progress);
+
+fun display_normal() { }
+fun display_password(prompt, bullets) {
+    if (!Global.prompt_text) {
+        Global.prompt_text = Sprite();
+        Global.prompt_text.SetPosition(cx - 200, text_y + text_h + 90, 4);
+    }
+    Global.prompt_text.SetImage(Image.Text(prompt + " " + bullets, 0.2, 1.0, 0.95, 1.0));
+}
+fun display_message(msg) { }
+
+Plymouth.SetDisplayNormalFunction(display_normal);
+Plymouth.SetDisplayPasswordFunction(display_password);
+Plymouth.SetMessageFunction(display_message);

@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=BITE-OS
+Description=BITE-OS boot splash — glitch-wolf on black, subtle pulse
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/glitch-os
+ScriptFile=/usr/share/plymouth/themes/glitch-os/glitch-os.script

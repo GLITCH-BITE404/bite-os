@@ -1,0 +1,115 @@
+// BITE-OS animated boot splash
+// Fangs descend from above and bite the BITE-OS text, with glitch jitter.
+
+Window.SetBackgroundTopColor(0.02, 0.02, 0.04);
+Window.SetBackgroundBottomColor(0.02, 0.02, 0.04);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+screen_x = Window.GetX();
+screen_y = Window.GetY();
+cx = screen_x + screen_w / 2;
+cy = screen_y + screen_h / 2;
+
+// ----- BITE-OS text (rendered, then scaled up) -----
+text_raw = Image.Text("BITE-OS", 0.65, 0.35, 1.0, 1.0);
+text_img = text_raw.Scale(text_raw.GetWidth() * 4, text_raw.GetHeight() * 4);
+text_sprite = Sprite(text_img);
+text_x = cx - text_img.GetWidth() / 2;
+text_y = cy - text_img.GetHeight() / 2;
+text_sprite.SetPosition(text_x, text_y, 0);
+text_sprite.SetOpacity(0);
+
+// Cyan ghost copy for chromatic-aberration glitch
+text_ghost = Sprite(Image.Text("BITE-OS", 0.2, 1.0, 0.95, 0.7).Scale(text_raw.GetWidth() * 4, text_raw.GetHeight() * 4));
+text_ghost.SetPosition(text_x, text_y, -1);
+text_ghost.SetOpacity(0);
+
+// ----- Fangs (icon.png) -----
+fangs_img = Image("fangs.png");
+fangs_sprite = Sprite(fangs_img);
+fangs_x = cx - fangs_img.GetWidth() / 2;
+fangs_target_y = text_y - fangs_img.GetHeight() * 0.7;  // overlap from above
+fangs_start_y = screen_y - fangs_img.GetHeight();
+fangs_sprite.SetPosition(fangs_x, fangs_start_y, 1);
+fangs_sprite.SetOpacity(0);
+
+frame = 0;
+
+fun refresh() {
+    frame = frame + 1;
+
+    // Phase 1 (frames 0-20, ~0.8s): text fades in
+    if (frame < 20) {
+        opacity = frame / 20;
+        text_sprite.SetOpacity(opacity);
+        text_ghost.SetOpacity(opacity * 0.4);
+    }
+
+    // Phase 2 (20-55, ~1.4s): fangs descend with glitch jitter
+    if (frame >= 20 && frame < 55) {
+        t = (frame - 20) / 35;
+        eased = t * (2 - t);  // ease-out
+        y = fangs_start_y + (fangs_target_y - fangs_start_y) * eased;
+        jx = (Math.Random() - 0.5) * 40 * (1 - t);
+        fangs_sprite.SetPosition(fangs_x + jx, y, 1);
+        fangs_sprite.SetOpacity(eased);
+        text_sprite.SetOpacity(1);
+    }
+
+    // Phase 3 (55+): held bite + glitch loop
+    if (frame >= 55) {
+        text_sprite.SetOpacity(1);
+        fangs_sprite.SetOpacity(1);
+
+        // chromatic-aberration glitch on text (random offset of ghost copy)
+        gx = (Math.Random() - 0.5) * 6;
+        gy = (Math.Random() - 0.5) * 2;
+        text_ghost.SetPosition(text_x + gx, text_y + gy, -1);
+
+        // occasional position jitter on fangs
+        roll = Math.Random();
+        if (roll < 0.08) {
+            jx = (Math.Random() - 0.5) * 12;
+            jy = (Math.Random() - 0.5) * 6;
+            fangs_sprite.SetPosition(fangs_x + jx, fangs_target_y + jy, 1);
+        } else {
+            fangs_sprite.SetPosition(fangs_x, fangs_target_y, 1);
+        }
+
+        // occasional opacity flicker
+        if (Math.Random() < 0.05) {
+            text_sprite.SetOpacity(0.4 + Math.Random() * 0.6);
+            fangs_sprite.SetOpacity(0.6 + Math.Random() * 0.4);
+        }
+
+        // restart loop every ~5s
+        if (frame > 175) {
+            frame = 0;
+            fangs_sprite.SetPosition(fangs_x, fangs_start_y, 1);
+            fangs_sprite.SetOpacity(0);
+            text_sprite.SetOpacity(0);
+            text_ghost.SetOpacity(0);
+        }
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh);
+
+fun boot_progress(time, percent) { }
+Plymouth.SetBootProgressFunction(boot_progress);
+
+// Password prompt for LUKS
+fun display_normal() { }
+fun display_password(prompt, bullets) {
+    if (!Global.prompt_text) {
+        Global.prompt_text = Sprite();
+        Global.prompt_text.SetPosition(cx - 150, text_y + text_img.GetHeight() + 60, 2);
+    }
+    Global.prompt_text.SetImage(Image.Text(prompt + " " + bullets, 0.8, 0.4, 1.0, 1.0));
+}
+fun display_message(msg) { }
+
+Plymouth.SetDisplayNormalFunction(display_normal);
+Plymouth.SetDisplayPasswordFunction(display_password);
+Plymouth.SetMessageFunction(display_message);

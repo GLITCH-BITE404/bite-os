@@ -1,0 +1,83 @@
+#!/bin/bash
+# bite-os-fix-boot — HARDENED. Forces every systemd-boot entry's "title" to
+# say BITE-OS, and NOTHING else.
+#
+# Safety contract — this script physically cannot lock you out:
+#   • Only the `title` line of an entry is ever changed.
+#   • Every entry is backed up to /var/lib/bite-os/boot-backup/ first.
+#   • After each edit the result is diffed against the original with title
+#     lines removed — if ANY other line differs, the edit is thrown away.
+#   • If an entry somehow loses its `linux` line, it is restored from backup.
+#   • loader.conf (default=, timeout=, the boot path) is NEVER touched.
+set -uo pipefail
+log() { echo "[bite-os-fix-boot] $*"; }
+
+# --- locate the systemd-boot entries directory --------------------------------
+ESP=""
+for c in /boot /efi /boot/efi; do
+    [[ -d "$c/loader/entries" ]] && { ESP="$c"; break; }
+done
+[[ -z "$ESP" ]] && { log "no systemd-boot entries dir — nothing to do"; exit 0; }
+ENTRIES_DIR="$ESP/loader/entries"
+
+shopt -s nullglob
+entries=("$ENTRIES_DIR"/*.conf)
+[[ ${#entries[@]} -eq 0 ]] && { log "no entries found — nothing to do"; exit 0; }
+
+# --- back up every entry BEFORE touching anything -----------------------------
+BACKUP_DIR="/var/lib/bite-os/boot-backup/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+cp -a "$ENTRIES_DIR"/*.conf "$BACKUP_DIR"/ 2>/dev/null || true
+log "backed up ${#entries[@]} entries -> $BACKUP_DIR"
+# keep only the 10 newest backups
+ls -1dt /var/lib/bite-os/boot-backup/*/ 2>/dev/null | tail -n +11 | xargs -r rm -rf
+
+changed=0
+for f in "${entries[@]}"; do
+    base="$(basename "$f")"
+    # The entity name is always "BITE-OS". Kernel variants get a small
+    # parenthetical suffix. The words "cachyos"/"linux"/"arch" are never shown.
+    case "$base" in
+        *fallback*) new_title="BITE-OS (fallback)" ;;
+        *zen*)      new_title="BITE-OS (Zen)" ;;
+        *lts*)      new_title="BITE-OS (LTS)" ;;
+        *hardened*) new_title="BITE-OS (Hardened)" ;;
+        *rt*)       new_title="BITE-OS (RT)" ;;
+        *)          new_title="BITE-OS" ;;
+    esac
+
+    # Build a candidate with ONLY the title line changed.
+    tmp="$(mktemp)"
+    if grep -q '^[[:space:]]*title[[:space:]]' "$f"; then
+        awk -v t="$new_title" '
+            /^[[:space:]]*title[[:space:]]/ && !d { print "title   " t; d=1; next }
+            { print }
+        ' "$f" > "$tmp"
+    else
+        { echo "title   $new_title"; cat "$f"; } > "$tmp"
+    fi
+
+    # VERIFY: with all title lines stripped, candidate must be byte-identical
+    # to the original. If not, the edit touched something it must not — drop it.
+    if diff <(grep -v '^[[:space:]]*title[[:space:]]' "$f") \
+            <(grep -v '^[[:space:]]*title[[:space:]]' "$tmp") >/dev/null 2>&1; then
+        if ! cmp -s "$f" "$tmp"; then
+            cat "$tmp" > "$f"
+            changed=1
+            log "retitled $base -> $new_title"
+        fi
+    else
+        log "ABORT on $base: edit would change a non-title line — original kept"
+    fi
+    rm -f "$tmp"
+
+    # Final paranoia check: the entry MUST still boot a kernel.
+    if ! grep -q '^[[:space:]]*linux[[:space:]]' "$f"; then
+        log "ERROR: $base has no 'linux' line — restoring from backup"
+        cp -a "$BACKUP_DIR/$base" "$f"
+    fi
+done
+
+(( changed == 0 )) && log "all entries already branded"
+log "done — kernel paths, initrd, options and loader.conf left untouched"
+exit 0

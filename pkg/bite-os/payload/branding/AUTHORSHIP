@@ -1,0 +1,20 @@
+BITE-OS — Authorship & Credit
+==============================
+
+BITE-OS is created and maintained by GLITCH-BITE404.
+
+  Author:   GLITCH-BITE404
+  Contact:  virnikrephael@gmail.com
+  TikTok:   https://www.tiktok.com/@glitch_bite404
+  Source:   https://github.com/GLITCH-BITE404/BITE-OS
+  License:  GNU General Public License v3.0 (see /usr/share/licenses)
+
+BITE-OS is built on the CachyOS / Arch base. Bundled upstream components
+(Hyprland, CachyOS base, caelestia, Quickshell, fonts, …) retain their own
+respective licenses and authorship.
+
+If you fork, remix or redistribute BITE-OS you must credit the author
+(GLITCH-BITE404), link back to the repository, keep your version open-source
+under the same license, and not present your fork as the official BITE-OS.
+
+// THE SYSTEM BIT YOU

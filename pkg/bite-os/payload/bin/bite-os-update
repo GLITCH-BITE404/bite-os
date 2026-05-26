@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  ◈ BITE-OS — system updater  ·  © GLITCH-BITE404  ·  // THE SYSTEM BIT YOU
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Updates EVERYTHING (kernel, apps, drivers, AUR, the rice) while staying
+# BITE-OS — the bite-os package's pacman hooks re-apply branding on every
+# upgrade, so a full update never turns your system back into vanilla CachyOS.
+#
+# Optional + transparent: it asks before doing anything and shows full logs.
+# Run it directly any time with the command:  bite-os-update
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+set -uo pipefail
+
+LOGDIR="${XDG_STATE_HOME:-$HOME/.local/state}/bite-os"
+mkdir -p "$LOGDIR"
+LOG="$LOGDIR/update-$(date +%Y%m%d-%H%M%S).log"
+ln -sf "$LOG" "$LOGDIR/update-latest.log"
+
+C_RESET=$'\e[0m'; C_CYAN=$'\e[38;2;0;255;204m'; C_MAUVE=$'\e[38;2;189;70;220m'
+C_DIM=$'\e[2m'; C_BOLD=$'\e[1m'
+
+banner() {
+    printf '%s' "$C_MAUVE"
+    cat <<'EOF'
+   ▟▛▜▙  BITE-OS UPDATE
+   ▜▄▄▛  // THE SYSTEM BIT YOU
+EOF
+    printf '%s' "$C_RESET"
+    echo "${C_DIM}log: $LOG${C_RESET}"
+    echo
+}
+
+# Mirror everything to the log as well as the screen.
+exec > >(tee -a "$LOG") 2>&1
+
+banner
+
+echo "${C_CYAN}==> Checking for updates...${C_RESET}"
+# Refresh databases first so the count is accurate.
+sudo pacman -Sy >/dev/null 2>&1 || true
+if command -v checkupdates >/dev/null 2>&1; then
+    PENDING="$(checkupdates 2>/dev/null | wc -l)"
+else
+    PENDING="$(pacman -Qu 2>/dev/null | wc -l)"
+fi
+AURHELPER=""
+for h in paru yay; do command -v "$h" >/dev/null 2>&1 && { AURHELPER="$h"; break; }; done
+
+echo "   official packages with updates: ${C_BOLD}${PENDING}${C_RESET}"
+[ -n "$AURHELPER" ] && echo "   AUR will also be checked via: ${C_BOLD}${AURHELPER}${C_RESET}"
+echo
+
+if [ "${PENDING:-0}" -eq 0 ] && [ -z "$AURHELPER" ]; then
+    echo "${C_CYAN}Your system is already up to date.${C_RESET}"
+    echo; read -rp "Press Enter to close..."; exit 0
+fi
+
+read -rp "Update now? [Y/n] " ans
+case "${ans,,}" in
+    n|no) echo "Cancelled. Nothing was changed."; read -rp "Press Enter to close..."; exit 0 ;;
+esac
+
+echo
+echo "${C_CYAN}==> Updating the whole system (this keeps it BITE-OS)...${C_RESET}"
+if [ -n "$AURHELPER" ]; then
+    "$AURHELPER" -Syu --noconfirm
+else
+    sudo pacman -Syu --noconfirm
+fi
+rc=$?
+
+echo
+# Re-assert BITE-OS branding in case an upstream package tried to overwrite it.
+[ -x /usr/bin/bite-os-rebrand ] && sudo /usr/bin/bite-os-rebrand >/dev/null 2>&1 || true
+
+if [ "$rc" -eq 0 ]; then
+    echo "${C_CYAN}✓ Update complete. Still BITE-OS.${C_RESET}"
+    command -v notify-send >/dev/null && notify-send "BITE-OS" "System updated successfully." || true
+    echo "${C_DIM}If a new kernel was installed, reboot when convenient.${C_RESET}"
+else
+    echo "${C_MAUVE}✗ Update finished with errors (exit $rc). See the log: $LOG${C_RESET}"
+    command -v notify-send >/dev/null && notify-send -u critical "BITE-OS" "Update had errors — see $LOG" || true
+fi
+echo
+read -rp "Press Enter to close..."

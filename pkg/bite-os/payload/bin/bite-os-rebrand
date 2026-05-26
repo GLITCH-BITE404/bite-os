@@ -1,0 +1,6 @@
+#!/bin/bash
+# BITE-OS — restore branding after package updates
+cp /usr/share/bite-os/os-release  /etc/os-release
+cp /usr/share/bite-os/lsb-release /etc/lsb-release
+cp /usr/share/bite-os/issue       /etc/issue
+[ -f /usr/share/bite-os/fastfetch.jsonc ] && cp /usr/share/bite-os/fastfetch.jsonc /etc/fastfetch/config.jsonc
