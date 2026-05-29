@@ -66,6 +66,46 @@ if [ -f /etc/calamares/modules/removeuser.conf ]; then
     sed -i -E 's/^username:.*/username: bite/' /etc/calamares/modules/removeuser.conf
 fi
 
+# 3b. Reconcile cachyos-calamares with BITE-OS's archiso `releng` base. cachyos
+#     ships its installer configs tuned for ITS OWN single-kernel, limine ISO;
+#     ours differs in three ways that each break the offline install:
+#
+#   (a) Dual kernel. releng pulls in stock `linux` AND we add `linux-cachyos`,
+#       so the target has BOTH mkinitcpio presets. The stock unpackfs only
+#       copies vmlinuz-linux-cachyos to the target /boot, so `mkinitcpio -P`
+#       (builds initramfs for *every* preset) dies on linux.preset with
+#       "/boot/vmlinuz-linux must be readable". Fix: copy vmlinuz-linux too.
+#   (b) Wrong bootloader. bootloader.conf defaults to `limine`, which is NOT in
+#       our package set — the bootloader step would fail. `grub` IS installed
+#       and handles BOTH BIOS and UEFI, so point Calamares at grub.
+#   (c) Oversized ESP. The limine layout wants a 2 GB EFI partition mounted at
+#       /boot. grub keeps kernels on the root /boot and only needs a small ESP
+#       at /boot/efi, so drop it to 512M.
+#
+# Patch whichever location each module config lives in (/etc wins over /usr/share).
+for U in /etc/calamares/modules/unpackfs.conf /usr/share/calamares/modules/unpackfs.conf; do
+    [ -f "$U" ] || continue
+    if ! grep -qE 'vmlinuz-linux"' "$U"; then
+        cat >> "$U" <<'UNPACK'
+    -   source: "/run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux"
+        sourcefs: "file"
+        destination: "/boot/vmlinuz-linux"
+UNPACK
+        echo "[customize_airootfs] unpackfs: now copies stock vmlinuz-linux too ($U)"
+    fi
+done
+for B in /etc/calamares/modules/bootloader.conf /usr/share/calamares/modules/bootloader.conf; do
+    [ -f "$B" ] || continue
+    sed -i -E 's/^efiBootLoader:.*/efiBootLoader: "grub"/' "$B"
+    echo "[customize_airootfs] bootloader: efiBootLoader -> grub ($B)"
+done
+for P in /etc/calamares/modules/partition.conf /usr/share/calamares/modules/partition.conf; do
+    [ -f "$P" ] || continue
+    sed -i -E 's#^(efiSystemPartition:[[:space:]]+).*#\1"/boot/efi"#' "$P"
+    sed -i -E 's/^(efiSystemPartitionSize:[[:space:]]+).*/\1512M/' "$P"
+    echo "[customize_airootfs] partition: ESP -> /boot/efi @ 512M ($P)"
+done
+
 # Put the BITE-OS wolf on the GRUB boot screen (the offline install uses GRUB
 # with the cachyos theme; swap its background image for ours).
 GRUB_THEME=/usr/share/grub/themes/cachyos
@@ -110,6 +150,8 @@ for f in /usr/bin/cage /usr/local/bin/bite-os-installer-session \
     [ -e "$f" ] || { echo "[customize_airootfs] FATAL: missing $f" >&2; exit 1; }
 done
 command -v calamares >/dev/null || { echo "[customize_airootfs] FATAL: calamares not installed" >&2; exit 1; }
+command -v grub-install >/dev/null || { echo "[customize_airootfs] FATAL: grub not installed — Calamares bootloader step (efiBootLoader: grub) would fail" >&2; exit 1; }
+[ -f /etc/mkinitcpio.d/linux.preset ] && [ -f /etc/mkinitcpio.d/linux-cachyos.preset ] || { echo "[customize_airootfs] FATAL: expected both linux + linux-cachyos presets (unpackfs copies both kernels)" >&2; exit 1; }
 if [ ! -s /etc/skel/.config/hypr/hyprland.conf ]; then
     echo "[customize_airootfs] FATAL: /etc/skel rice missing — installed users won't get BITE-OS" >&2
     exit 1
