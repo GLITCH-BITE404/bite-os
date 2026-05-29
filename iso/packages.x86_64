@@ -106,7 +106,6 @@ lib32-vulkan-radeon
 lib32-nvidia-utils
 linux-cachyos-headers
 dkms
-nvidia-dkms
 nvidia-utils
 opencl-nvidia
 egl-wayland

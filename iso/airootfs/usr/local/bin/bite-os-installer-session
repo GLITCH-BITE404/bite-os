@@ -4,4 +4,16 @@
 # `cage` is a single-application Wayland kiosk: it brings up a compositor and
 # runs ONE program fullscreen — here, the Calamares installer. No Hyprland, no
 # rice, no caelestia, nothing that can crash and hijack the screen.
-exec cage -s -d -- /usr/local/bin/bite-os-kiosk
+# Force software rendering + disable HW cursors so cage starts on GPUs that
+# wlroots can't drive (VirtualBox/VMware without 3D accel, ancient iGPUs).
+# Without this, cage exits instantly on first frame and SDDM bounces us back
+# to the login screen with no useful error.
+export WLR_RENDERER="${WLR_RENDERER:-pixman}"
+export WLR_NO_HARDWARE_CURSORS=1
+export WLR_BACKENDS="${WLR_BACKENDS:-drm,libinput}"
+
+# Log to a known path so failures are debuggable from a TTY.
+LOG=/tmp/bite-os-installer-session.log
+echo "── $(date '+%F %T') starting cage as $(id -un) ──" > "$LOG"
+
+exec cage -s -d -- /usr/local/bin/bite-os-kiosk &>> "$LOG"
